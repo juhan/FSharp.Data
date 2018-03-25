@@ -58,43 +58,19 @@ resources with specified headers, query parameters and HTTP body</p>
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '328', 328)" onmouseover="showTip(event, '328', 328)">
+          <code onmouseout="hideTip(event, '329', 329)" onmouseover="showTip(event, '329', 329)">
             AsyncRequest(...)
           </code>
-          <div class="tip" id="328">
+          <div class="tip" id="329">
             <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * responseEncodingOverride:string option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; Async&lt;HttpResponse&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1685-1685" class="github-link">
+            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1689-1689" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Download an HTTP web resource from the specified URL asynchronously
-(allows specifying query string parameters and HTTP headers including
-headers that have to be handled specially - such as Accept, Content-Type &amp; Referer)
-The body for POST request can be specified either as text or as a list of parameters
-that will be encoded, and the method will automatically be set if not specified</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '329', 329)" onmouseover="showTip(event, '329', 329)">
-            AsyncRequestStream(...)
-          </code>
-          <div class="tip" id="329">
-            <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; Async&lt;HttpResponseWithStream&gt;<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1735-1735" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Download an HTTP web resource from the specified URL synchronously
 (allows specifying query string parameters and HTTP headers including
 headers that have to be handled specially - such as Accept, Content-Type &amp; Referer)
 The body for POST request can be specified either as text or as a list of parameters
@@ -107,38 +83,14 @@ that will be encoded, and the method will automatically be set if not specified<
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '330', 330)" onmouseover="showTip(event, '330', 330)">
-            AsyncRequestString(...)
+            AsyncRequestStream(...)
           </code>
           <div class="tip" id="330">
-            <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * responseEncodingOverride:string option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; Async&lt;string&gt;<br />
+            <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; Async&lt;HttpResponseWithStream&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1707-1707" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Download an HTTP web resource from the specified URL asynchronously
-(allows specifying query string parameters and HTTP headers including
-headers that have to be handled specially - such as Accept, Content-Type &amp; Referer)
-The body for POST request can be specified either as text or as a list of parameters
-that will be encoded, and the method will automatically be set if not specified</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '331', 331)" onmouseover="showTip(event, '331', 331)">
-            Request(...)
-          </code>
-          <div class="tip" id="331">
-            <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * responseEncodingOverride:string option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; HttpResponse<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1773-1773" class="github-link">
+            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1739-1739" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -154,15 +106,39 @@ that will be encoded, and the method will automatically be set if not specified<
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '332', 332)" onmouseover="showTip(event, '332', 332)">
-            RequestStream(...)
+          <code onmouseout="hideTip(event, '331', 331)" onmouseover="showTip(event, '331', 331)">
+            AsyncRequestString(...)
           </code>
-          <div class="tip" id="332">
-            <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; HttpResponseWithStream<br />
+          <div class="tip" id="331">
+            <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * responseEncodingOverride:string option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; Async&lt;string&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1819-1819" class="github-link">
+            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1711-1711" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Download an HTTP web resource from the specified URL asynchronously
+(allows specifying query string parameters and HTTP headers including
+headers that have to be handled specially - such as Accept, Content-Type &amp; Referer)
+The body for POST request can be specified either as text or as a list of parameters
+that will be encoded, and the method will automatically be set if not specified</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '332', 332)" onmouseover="showTip(event, '332', 332)">
+            Request(...)
+          </code>
+          <div class="tip" id="332">
+            <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * responseEncodingOverride:string option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; HttpResponse<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1777-1777" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -179,14 +155,38 @@ that will be encoded, and the method will automatically be set if not specified<
         <td class="member-name">
 
           <code onmouseout="hideTip(event, '333', 333)" onmouseover="showTip(event, '333', 333)">
-            RequestString(...)
+            RequestStream(...)
           </code>
           <div class="tip" id="333">
+            <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; HttpResponseWithStream<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1823-1823" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Download an HTTP web resource from the specified URL synchronously
+(allows specifying query string parameters and HTTP headers including
+headers that have to be handled specially - such as Accept, Content-Type &amp; Referer)
+The body for POST request can be specified either as text or as a list of parameters
+that will be encoded, and the method will automatically be set if not specified</p>
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '334', 334)" onmouseover="showTip(event, '334', 334)">
+            RequestString(...)
+          </code>
+          <div class="tip" id="334">
             <strong>Signature:</strong> (url:string * query:(string * string) list option * headers:seq&lt;string * string&gt; option * httpMethod:string option * body:HttpRequestBody option * cookies:seq&lt;string * string&gt; option * cookieContainer:CookieContainer option * silentHttpErrors:bool option * responseEncodingOverride:string option * customizeHttpRequest:(HttpWebRequest -&gt; HttpWebRequest) option * timeout:int option) -&gt; string<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1796-1796" class="github-link">
+            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/Net/Http.fs#L1800-1800" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
