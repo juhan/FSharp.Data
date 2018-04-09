@@ -59,11 +59,9 @@
     <tbody>
         <tr>
           <td class="type-name">
-            <a href="fsharp-data-runtime-caching-icache-1.html">ICache<'T></a>
+            <a href="fsharp-data-runtime-caching-icache-2.html">ICache<'TKey, 'TValue></a>
           </td>
-          <td class="xmldoc"><p>Represents a cache (various implementations are available)</p>
-
-</td>
+          <td class="xmldoc"></td>
         </tr>
     </tbody>
   </table>
@@ -83,11 +81,11 @@
             createInMemoryCache expiration
           </code>
           <div class="tip" id="159">
-            <strong>Signature:</strong> expiration:TimeSpan -&gt; ICache&lt;&#39;?8431&gt;<br />
-                          <strong>Type parameters:</strong> '?8431          </div>
+            <strong>Signature:</strong> expiration:TimeSpan -&gt; ICache&lt;&#39;TKey_,&#39;TValue&gt;<br />
+                          <strong>Type parameters:</strong> 'TKey_, 'TValue          </div>
         </td>
         <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/CommonRuntime/Caching.fs#L23-23" class="github-link">
+            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/CommonRuntime/Caching.fs#L19-19" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
@@ -103,35 +101,15 @@
             createInternetFileCache (...)
           </code>
           <div class="tip" id="160">
-            <strong>Signature:</strong> prefix:string -&gt; expiration:TimeSpan -&gt; ICache&lt;string&gt; * string<br />
+            <strong>Signature:</strong> prefix:string -&gt; expiration:TimeSpan -&gt; ICache&lt;string,string&gt;<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/CommonRuntime/Caching.fs#L43-43" class="github-link">
+            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/CommonRuntime/Caching.fs#L58-58" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
           <p>Creates a cache that stores data in a local file system</p>
-
-
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '161', 161)" onmouseover="showTip(event, '161', 161)">
-            createNonCachingCache ()
-          </code>
-          <div class="tip" id="161">
-            <strong>Signature:</strong> unit -&gt; ICache&lt;&#39;T&gt;<br />
-                          <strong>Type parameters:</strong> 'T          </div>
-        </td>
-        <td class="xmldoc">
-            <a href="https://github.com/fsharp/FSharp.Data/tree/master/src/CommonRuntime/Caching.fs#L17-17" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          <p>Creates a fake cache</p>
 
 
         </td>
