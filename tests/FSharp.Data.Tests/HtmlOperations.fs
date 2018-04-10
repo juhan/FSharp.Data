@@ -1,9 +1,9 @@
 ﻿#if INTERACTIVE
-#r "../../bin/FSharp.Data.dll"
-#r "../../bin/FSharp.Data.Experimental.dll"
-#r "../../packages/NUnit/lib/nunit.framework.dll"
+#r "../../bin/lib/net45/FSharp.Data.dll"
+#r "../../bin/typeproviders/fsharp41/net45/FSharp.Data.Experimental.dll"
+#r "../../packages/test/NUnit/lib/net45/nunit.framework.dll"
 #r "System.Xml.Linq.dll"
-#load "../Common/FsUnit.fs"
+#r "../../packages/test/FsUnit/lib/net46/FsUnit.NUnit.dll"
 #else
 module FSharp.Data.Tests.HtmlOperations
 #endif
@@ -138,6 +138,12 @@ let ``Can extract the inner text from a node``() =
         "Column 1Column 2"
         "1yes"
     ]
+
+[<Test>]
+let ``Can get direct inner text``() = 
+    let html = "<div>21 minutes ago<span> LIVE</span> x</div>" |> HtmlNode.Parse |> Seq.exactlyOne
+    html.InnerText() |> should equal "21 minutes ago LIVE x"
+    html.DirectInnerText() |> should equal "21 minutes ago x"
 
 [<Test>]
 let ``Inner text on a comment should be String.Empty``() = 

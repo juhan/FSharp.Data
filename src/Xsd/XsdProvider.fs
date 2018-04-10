@@ -17,10 +17,10 @@ open FSharp.Data.Runtime.StructuralTypes
 
 [<TypeProvider>]
 type public XsdProvider(cfg:TypeProviderConfig) as this =
-  inherit DisposableTypeProviderForNamespaces()
+  inherit DisposableTypeProviderForNamespaces(cfg, assemblyReplacementMap=[ "FSharp.Data.DesignTime", "FSharp.Data" ])
 
   // Generate namespace and type 'FSharp.Data.XmlProvider'
-  let asm, version, replacer = AssemblyResolver.init cfg
+  let asm, version = AssemblyResolver.init cfg (this :> TypeProviderForNamespaces)
   let ns = "FSharp.Data"
 
   let xmlProvTy = ProvidedTypeDefinition(asm, ns, "XsdProvider", Some typeof<obj>)
@@ -97,7 +97,7 @@ type public XsdProvider(cfg:TypeProviderConfig) as this =
                                                                     Type = t}],false)
             | _ as t -> t
         
-          let ctx = XmlGenerationContext.Create(System.Globalization.CultureInfo.CurrentCulture.Name, tpType, true, replacer)  
+          let ctx = XmlGenerationContext.Create(System.Globalization.CultureInfo.CurrentCulture.Name, tpType, true)  
           XmlTypeBuilder.generateXmlType ctx inferedType
         
         let result = getTypesFromSchema sample
@@ -110,9 +110,9 @@ type public XsdProvider(cfg:TypeProviderConfig) as this =
             CreateFromTextReaderForSampleList = fun reader -> 
               result.Converter <@@ XmlElement.CreateList(%reader) @@> }
         
-        let providedType =
-            generateType "XSD"sample false parseSingle parseList getSpec 
-                 version this cfg replacer encodingStr resolutionFolder resource typeName None
+        let providedType = 
+            generateType "XSD" sample false parseSingle parseList getSpec
+                         version this cfg encodingStr resolutionFolder resource typeName None
         let inferedType = getTypes sample
         
         let typeList = 
@@ -132,14 +132,13 @@ type public XsdProvider(cfg:TypeProviderConfig) as this =
                         | _ -> failwithf "can't parse name %s" qn
                 let res = providedType.GetMember(n) 
                 match res with
-                  [||] -> 
+                | [||] -> 
                       failwithf "Could not find a provided type for %s" n
-                  | [|res|] when (res :? ProvidedTypeDefinition) ->
+                | [|res|] when (res :? ProvidedTypeDefinition) ->
                       let resultType = res :?> ProvidedTypeDefinition
                       let args = [ ProvidedParameter("text", typeof<string>) ]
-                      let m = ProvidedMethod("Parse" + n, args, resultType, IsStaticMethod = true)
                       let nlower = n.ToLower()
-                      m.InvokeCode <- fun (Singleton text) -> 
+                      let m = ProvidedMethod("Parse" + n, args, resultType, isStatic = true, invokeCode = fun (Singleton text) -> 
                         
                         <@ 
                             let t = %%text
@@ -157,10 +156,10 @@ type public XsdProvider(cfg:TypeProviderConfig) as this =
                                  t
                             new StringReader(t) :> TextReader
                         @>
-                        |> fun reader -> result.Converter <@@ XmlElement.Create(%reader) @@>
+                        |> fun reader -> result.Converter <@@ XmlElement.Create(%reader) @@>)
                       m.AddXmlDoc <| sprintf "Parses the specified XML string as a %s" n
                       tpType.AddMember m
-                  | [|res|] -> failwithf "%s is not a provided type but a " res.Name (res.GetType().Name)
+                  | [|res|] -> failwithf "%s is not a provided type but a %s" res.Name (res.GetType().Name)
                   | _ as res -> failwithf "Found several nested types (%A) with the name %s" res n
               | _ -> ()
           

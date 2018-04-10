@@ -7,10 +7,11 @@ module ProviderImplementation.QuotationBuilder
 
 open System
 open System.Reflection
-open Microsoft.FSharp.Quotations
-open Microsoft.FSharp.Quotations.Patterns
-open Microsoft.FSharp.Reflection
+open FSharp.Quotations
+open FSharp.Quotations.Patterns
+open FSharp.Reflection
 open ProviderImplementation.ProvidedTypes
+open UncheckedQuotations
 
 /// Dynamic operator (?) that can be used for constructing quoted F# code without 
 /// quotations (to simplify constructing F# quotations in portable libraries - where

@@ -14,9 +14,11 @@ TestResult.xml
 log.csv
 log.txt
 .paket/paket.exe
+.paket/load
 paket-files
 *.ide
 *.bak
 .vs
-.fake
-.vagrant
+.fakeTestResults
+*.log
+.vscode

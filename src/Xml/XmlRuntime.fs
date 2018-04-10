@@ -171,17 +171,17 @@ type XmlRuntime =
     else None
 
   /// Returns the contents of the element as a JsonValue
-  static member GetJsonValue(xml, cultureStr) = 
+  static member GetJsonValue(xml) = 
     match XmlRuntime.TryGetValue(xml) with
-    | Some jsonStr -> JsonDocument.Create(new StringReader(jsonStr), cultureStr)
+    | Some jsonStr -> JsonDocument.Create(new StringReader(jsonStr))
     | None -> failwithf "XML mismatch: Element doesn't contain value: %A" xml
 
   /// Tries to return the contents of the element as a JsonValue
-  static member TryGetJsonValue(xml, cultureStr) = 
+  static member TryGetJsonValue(xml) = 
     match XmlRuntime.TryGetValue(xml) with
     | Some jsonStr -> 
         try
-            JsonDocument.Create(new StringReader(jsonStr), cultureStr) |> Some
+            JsonDocument.Create(new StringReader(jsonStr)) |> Some
         with _ -> None
     | None -> None
 
@@ -197,7 +197,14 @@ type XmlRuntime =
             (^a : (member ToString : IFormatProvider -> string) (v, cultureInfo)) 
         let serialize (v:obj) =
             match v with
-            | :? XmlElement as v -> box v.XElement
+            | :? XmlElement as v ->
+                let xElement = 
+                    if v.XElement.Parent = null then
+                        v.XElement
+                    else 
+                        // clone, as element is connected to previous parent
+                        XElement(v.XElement)
+                box xElement
             | _ ->
                 match v with
                 | :? string        as v -> v
