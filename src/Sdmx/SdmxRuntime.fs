@@ -39,8 +39,8 @@ module Implementation =
           Name : string
           Description : string }
 
-    type internal ServiceConnection(restCache:ICache<_,_>,serviceUrl:string, sources) =
-
+    type internal ServiceConnection(restCache:ICache<_,_>,serviceUrl:string) =
+        let sources = List.empty
         let sdmxUrl (functions: string list) (props: (string * string) list) = 
             let url = 
                 serviceUrl::(List.map Uri.EscapeUriString functions)
@@ -383,10 +383,9 @@ type ISdmxData =
     abstract GetTopics<'T when 'T :> Topic> : unit -> seq<'T>
 
 /// [omit]
-type SdmxData(serviceUrl:string, sources:string) = 
-    let sources = sources.Split([| ';' |], StringSplitOptions.RemoveEmptyEntries) |> Array.toList
+type SdmxData(serviceUrl:string) = 
     let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
-    let connection = new ServiceConnection(restCache, serviceUrl, sources)
+    let connection = new ServiceConnection(restCache, serviceUrl)
     interface ISdmxData with
         member x.GetCountries() = CountryCollection(connection, None) :> seq<_>
         member x.GetRegions() = RegionCollection(connection) :> seq<_>
