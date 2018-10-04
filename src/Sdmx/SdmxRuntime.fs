@@ -1,5 +1,5 @@
 ﻿// --------------------------------------------------------------------------------------
-// Sdmx type provider - runtime components 
+// Sdmx type provider - runtime components
 // --------------------------------------------------------------------------------------
 
 namespace FSharp.Data.Runtime.Sdmx
@@ -15,88 +15,98 @@ open FSharp.Data.Runtime.Caching
 
 [<AutoOpen>]
 /// [omit]
-module Implementation = 
+module Implementation =
 
     let private retryCount = 5
     let private parallelIndicatorPageDownloads = 8
 
-    type internal IndicatorRecord = 
+    type internal IndicatorRecord =
         { Id : string
           Name: string
           TopicIds : string list
           Source : string
           Description : string }
 
-    type internal CountryRecord = 
+    type internal DimensionRecord =
+        { Id : string
+          Name: string
+          TestDimension : string}
+
+    type internal CountryRecord =
         { Id : string
           Name : string
           CapitalCity : string
           Region : string }
         member x.IsRegion = x.Region = "Aggregates"
 
-    type internal TopicRecord = 
+    type internal DataflowRecord =
+        { Id : string
+          Name : string 
+          Test: string }
+
+    type internal TopicRecord =
         { Id : string
           Name : string
           Description : string }
 
     type internal ServiceConnection(restCache:ICache<_,_>,serviceUrl:string) =
         let sources = List.empty
-        let sdmxUrl (functions: string list) (props: (string * string) list) = 
-            let url = 
+        let sdmxUrl (functions: string list) (props: (string * string) list) =
+            let url =
                 serviceUrl::(List.map Uri.EscapeUriString functions)
                 |> String.concat "/"
             let query = [ "per_page", "1000"
                           "format", "json" ] @ props
-            printfn "%s" url              
+            printfn "%s" url
             Http.AppendQueryToUrl(url, query)
 
         // The WorldBank data changes very slowly indeed (monthly updates to values, rare updates to schema), hence caching it is ok.
 
-        let rec worldBankRequest attempt funcs args : Async<string> = 
-            async { 
+        let rec worldBankRequest attempt funcs args : Async<string> =
+            async {
                 let url = sdmxUrl funcs args
                 match restCache.TryRetrieve(url) with
                 | Some res -> return res
-                | None -> 
+                | None ->
                     Debug.WriteLine (sprintf "[WorldBank] downloading (%d): %s" attempt url)
                     try
-                        let! doc = Http.AsyncRequestString(url, headers = [ HttpRequestHeaders.UserAgent "F# Data WorldBank Type Provider" 
+                        let! doc = Http.AsyncRequestString(url, headers = [ HttpRequestHeaders.UserAgent "F# Data WorldBank Type Provider"
                                                                             HttpRequestHeaders.Accept HttpContentTypes.Json ])
                         Debug.WriteLine (sprintf "[WorldBank] got text: %s" (if doc = null then "null" elif doc.Length > 50 then doc.[0..49] + "..." else doc))
-                        if not (String.IsNullOrEmpty doc) then 
+                        if not (String.IsNullOrEmpty doc) then
                             restCache.Set(url, doc)
-                        return doc 
+                        return doc
                     with e ->
                         Debug.WriteLine (sprintf "[WorldBank] error: %s" (e.ToString()))
                         if attempt > 0 then
                             return! worldBankRequest (attempt - 1) funcs args
                         else return! failwithf "Failed to request '%s'. Error: %O" url e }
 
-        let rec getDocuments funcs args page parallelPages = 
-            async { let! docs = 
-                        Async.Parallel 
-                            [ for i in 0 .. parallelPages - 1 -> 
+        let rec getDocuments funcs args page parallelPages =
+            async { let! docs =
+                        Async.Parallel
+                            [ for i in 0 .. parallelPages - 1 ->
                                   worldBankRequest retryCount funcs (args @ ["page", string (page+i)]) ]
                     let docs = docs |> Array.map JsonValue.Parse
                     Debug.WriteLine (sprintf "[WorldBank] geting page count")
                     let pages = docs.[0].[0]?pages.AsInteger()
                     Debug.WriteLine (sprintf "[WorldBank] got page count = %d" pages)
-                    if (pages < page + parallelPages) then 
+                    if (pages < page + parallelPages) then
                         return Array.toList docs
-                    else 
+                    else
                         let! rest = getDocuments funcs args (page + parallelPages) (pages - parallelPages)
                         return Array.toList docs @ rest }
 
-        let getIndicators() = 
+        let getIndicators() =
             // Get the indicators in parallel, initially using 'parallelIndicatorPageDownloads' pages
             async { let! docs = getDocuments ["indicator"] [] 1 parallelIndicatorPageDownloads
-                    return 
+                    return
                         [ for doc in docs do
                             for ind in doc.[1] do
                                 let id = ind?id.AsString()
                                 let name = ind?name.AsString().Trim([|'"'|]).Trim()
                                 let sourceName = ind?source?value.AsString()
-                                if sources = [] || sources |> List.exists (fun source -> String.Compare(source, sourceName, StringComparison.OrdinalIgnoreCase) = 0) then 
+                                if sources = [] || sources |> List.exists (fun source -> String.Compare(source, sourceName, StringComparison.OrdinalIgnoreCase) = 0) then
                                     let topicIds = Seq.toList <| seq {
                                         for item in ind?topics do
                                             match item.TryGetProperty("id") with
@@ -110,9 +120,17 @@ module Implementation =
                                             Source = sourceName
                                             Description = sourceNote} ] }
 
-        let getTopics() = 
+        let getDimensions() =
+            async { return
+                        [ for dimension in [("1", "D1"); ("2", "D2")] do
+                            let (id, name) = dimension
+                            yield { Id = id
+                                    Name = name
+                                    TestDimension = "TestDimension" } ] }
+  
+        let getTopics() =
             async { let! docs = getDocuments ["topic"] [] 1 1
-                    return 
+                    return
                         [ for doc in docs do
                             for topic in doc.[1] do
                                 let id = topic?id.AsString()
@@ -122,9 +140,9 @@ module Implementation =
                                         Name = name
                                         Description = sourceNote } ] }
 
-        let getCountries(args) = 
+        let getCountries(args) =
             async { let! docs = getDocuments ["country"] args 1 1
-                    return 
+                    return
                         [ for doc in docs do
                             for country in doc.[1] do
                                 let region = country?region?value.AsString()
@@ -135,16 +153,22 @@ module Implementation =
                                         Name = name
                                         CapitalCity = capitalCity
                                         Region = region } ] }
-
-        let getRegions() = 
+        let getDataflows(args) =
+            async { return
+                        [ for dataflow in [("1", "Dataflow1"); ("2", "Dataflow2")] do
+                            let (id, name) = dataflow
+                            yield { Id = id
+                                    Name = name
+                                    Test = "test"} ] }
+        let getRegions() =
             async { let! docs = getDocuments ["region"] [] 1 1
-                    return 
+                    return
                         [ for doc in docs do
                             for ind in doc.[1] do
                                 yield ind?code.AsString(),
                                       ind?name.AsString() ] }
 
-        let getData funcs args (key:string) = 
+        let getData funcs args (key:string) =
             async { let! docs = getDocuments funcs args 1 1
                     return
                         [ for doc in docs do
@@ -156,15 +180,19 @@ module Implementation =
         let topics = lazy (getTopics() |> Async.RunSynchronously)
         let topicsIndexed = lazy (topics.Force() |> Seq.map (fun t -> t.Id, t) |> dict)
         let indicators = lazy (getIndicators() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Name) |> Seq.toList)
+        let dimensions = lazy (getDimensions() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Name) |> Seq.toList)
         let indicatorsIndexed = lazy (indicators.Force() |> Seq.map (fun i -> i.Id, i) |> dict)
+        let dimensionsIndexed = lazy (dimensions.Force() |> Seq.map (fun i -> i.Id, i) |> dict)
         let indicatorsByTopic = lazy (
-            indicators.Force() 
-            |> Seq.collect (fun i -> i.TopicIds |> Seq.map (fun topicId -> topicId, i.Id)) 
+            indicators.Force()
+            |> Seq.collect (fun i -> i.TopicIds |> Seq.map (fun topicId -> topicId, i.Id))
             |> Seq.groupBy fst
             |> Seq.map (fun (topicId, indicatorIds) -> topicId, indicatorIds |> Seq.map snd |> Seq.cache)
             |> dict)
         let countries = lazy (getCountries [] |> Async.RunSynchronously)
+        let dataflows = lazy (getDataflows [] |> Async.RunSynchronously)
         let countriesIndexed = lazy (countries.Force() |> Seq.map (fun c -> c.Id, c) |> dict)
+        let dataflowsIndexed = lazy (dataflows.Force() |> Seq.map (fun c -> c.Id, c) |> dict)
         let regions = lazy (getRegions() |> Async.RunSynchronously)
         let regionsIndexed = lazy (regions.Force() |> dict)
 
@@ -172,14 +200,18 @@ module Implementation =
         member internal __.TopicsIndexed = topicsIndexed.Force()
         member internal __.Indicators = indicators.Force()
         member internal __.IndicatorsIndexed = indicatorsIndexed.Force()
+        member internal __.Dimensions = dimensions.Force()
+        member internal __.DimensionsIndexed = dimensionsIndexed.Force()
         member internal __.IndicatorsByTopic = indicatorsByTopic.Force()
         member internal __.Countries = countries.Force()
         member internal __.CountriesIndexed = countriesIndexed.Force()
+        member internal __.Dataflows = dataflows.Force()
+        member internal __.DataflowsIndexed = dataflowsIndexed.Force()
         member internal __.Regions = regions.Force()
         member internal __.RegionsIndexed = regionsIndexed.Force()
         /// At runtime, download the data
-        member internal __.GetDataAsync(countryOrRegionCode, indicatorCode) = 
-            async { let! data = 
+        member internal __.GetDataAsync(countryOrRegionCode, indicatorCode) =
+            async { let! data =
                       getData
                         [ "countries"
                           countryOrRegionCode
@@ -187,55 +219,55 @@ module Implementation =
                           indicatorCode ]
                         [ "date", "1900:2050" ]
                         "date"
-                    return 
+                    return
                       seq { for k, v in data do
-                              if not (String.IsNullOrEmpty v) then 
-                                 yield int k, float v } 
+                              if not (String.IsNullOrEmpty v) then
+                                 yield int k, float v }
                       // It's a time series - sort it :-)  We should probably also interpolate (e.g. see R time series library)
-                      |> Seq.sortBy fst } 
+                      |> Seq.sortBy fst }
 
-        member internal x.GetData(countryOrRegionCode, indicatorCode) = 
+        member internal x.GetData(countryOrRegionCode, indicatorCode) =
              x.GetDataAsync(countryOrRegionCode, indicatorCode) |> Async.RunSynchronously
         member internal __.GetCountriesInRegion region = getCountries ["region", region] |> Async.RunSynchronously
-  
+
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 /// Indicator data
-type Indicator internal (connection:ServiceConnection, countryOrRegionCode:string, indicatorCode:string) = 
+type Indicator internal (connection:ServiceConnection, countryOrRegionCode:string, indicatorCode:string) =
     let data = connection.GetData(countryOrRegionCode, indicatorCode) |> Seq.cache
     let dataDict = lazy (dict data)
-    
+
     /// Get the code for the country or region of the indicator
     member x.Code = countryOrRegionCode
-    
+
     /// Get the code for the indicator
     member x.IndicatorCode = indicatorCode
-    
+
     /// Get the name of the indicator
     member x.Name = connection.IndicatorsIndexed.[indicatorCode].Name
-    
+
     /// Get the source of the indicator
     member x.Source = connection.IndicatorsIndexed.[indicatorCode].Source
-    
+
     /// Get the description of the indicator
     member x.Description = connection.IndicatorsIndexed.[indicatorCode].Description
-    
+
     /// Get the indicator value for the given year. If there's no data for that year, NaN is returned
     member x.Item
-        with get year = 
+        with get year =
             match dataDict.Force().TryGetValue year with
             | true, value -> value
             | _ -> Double.NaN
-    
+
     /// Get the indicator value for the given year, if present
-    member x.TryGetValueAt year = 
+    member x.TryGetValueAt year =
         match dataDict.Force().TryGetValue year with
         | true, value -> Some value
         | _ -> None
-    
+
     /// Get the years for which the indicator has values
     member x.Years = dataDict.Force().Keys
-    
+
     /// Get the values for the indicator (without years)
     member x.Values = dataDict.Force().Values
 
@@ -244,8 +276,17 @@ type Indicator internal (connection:ServiceConnection, countryOrRegionCode:strin
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
+/// Dimension data
+type Dimension internal (connection:ServiceConnection, dataflowId:string, dimensionId:string) =
+    member x.DataflowId = dataflowId
+    member x.Id = dimensionId
+    member x.Name = connection.IndicatorsIndexed.[dimensionId].Name
+
+
+[<DebuggerDisplay("{Name}")>]
+[<StructuredFormatDisplay("{Name}")>]
 /// Metadata for an Indicator
-type IndicatorDescription internal (connection:ServiceConnection, topicCode:string, indicatorCode:string) = 
+type IndicatorDescription internal (connection:ServiceConnection, topicCode:string, indicatorCode:string) =
     /// Get the code for the topic of the indicator
     member x.Code = topicCode
     /// Get the code for the indicator
@@ -263,7 +304,13 @@ type IIndicators =
     abstract AsyncGetIndicator : indicatorCode:string -> Async<Indicator>
 
 /// [omit]
-type Indicators internal (connection:ServiceConnection, countryOrRegionCode) = 
+type IDimensions =
+    abstract GetDimension : dimensionId:string -> Dimension
+    abstract AsyncGetDimension : dimensionId:string -> Async<Dimension>
+
+
+/// [omit]
+type Indicators internal (connection:ServiceConnection, countryOrRegionCode) =
     let indicators = seq { for indicator in connection.Indicators -> Indicator(connection, countryOrRegionCode, indicator.Id) }
     interface IIndicators with
         member x.GetIndicator(indicatorCode) = Indicator(connection, countryOrRegionCode, indicatorCode)
@@ -272,53 +319,97 @@ type Indicators internal (connection:ServiceConnection, countryOrRegionCode) =
     interface IEnumerable with member x.GetEnumerator() = indicators.GetEnumerator() :> _
 
 /// [omit]
+type Dimensions internal (connection:ServiceConnection, dataflowId) =
+    let dimensions = seq { for dimension in connection.Dimensions -> Dimension(connection, dataflowId, dimension.Id) }
+    interface IDimensions with
+        member x.GetDimension(dimensionId) = Dimension(connection, dataflowId, dimensionId)
+        member x.AsyncGetDimension(dimensionId) = async { return Dimension(connection, dataflowId, dimensionId) }
+    interface seq<Dimension> with member x.GetEnumerator() = dimensions.GetEnumerator()
+    interface IEnumerable with member x.GetEnumerator() = dimensions.GetEnumerator() :> _
+
+
+/// [omit]
 type IIndicatorsDescriptions =
     abstract GetIndicator : indicatorCode:string -> IndicatorDescription
 
 /// [omit]
-type IndicatorsDescriptions internal (connection:ServiceConnection, topicCode) = 
+type IndicatorsDescriptions internal (connection:ServiceConnection, topicCode) =
     let indicatorsDescriptions = seq { for indicatorId in connection.IndicatorsByTopic.[topicCode] -> IndicatorDescription(connection, topicCode, indicatorId) }
     interface IIndicatorsDescriptions with member x.GetIndicator(indicatorCode) = IndicatorDescription(connection, topicCode, indicatorCode)
     interface seq<IndicatorDescription> with member x.GetEnumerator() = indicatorsDescriptions.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = indicatorsDescriptions.GetEnumerator() :> _
 
 /// [omit]
-type ICountry = 
+type ICountry =
     abstract GetIndicators : unit -> Indicators
+
+/// [omit]
+type IDataflow =
+    abstract GetDimensions : unit -> Dimensions
+
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 /// Metadata for a Country
-type Country internal (connection:ServiceConnection, countryCode:string) = 
+type Country internal (connection:ServiceConnection, countryCode:string) =
     let indicators = new Indicators(connection, countryCode)
     /// Get the WorldBank code of the country
     member x.Code = countryCode
-    /// Get the name of the country 
+    /// Get the name of the country
     member x.Name = connection.CountriesIndexed.[countryCode].Name
-    /// Get the capital city of the country 
+    /// Get the capital city of the country
     member x.CapitalCity = connection.CountriesIndexed.[countryCode].CapitalCity
-    /// Get the region of the country 
+    /// Get the region of the country
     member x.Region = connection.CountriesIndexed.[countryCode].Region
     interface ICountry with member x.GetIndicators() = indicators
+
+[<DebuggerDisplay("{Name}")>]
+[<StructuredFormatDisplay("{Name}")>]
+/// Metadata for a Dataflow
+type Dataflow internal (connection:ServiceConnection, dataflowId:string) =
+    let dimensions = new Dimensions(connection, dataflowId)
+    /// Get the WorldBank code of the country
+    member x.Id = dataflowId
+    /// Get the name of the country
+    member x.Name = connection.DataflowsIndexed.[dataflowId].Name
+    interface IDataflow with member x.GetDimensions() = dimensions
+
+
 
 /// [omit]
 type ICountryCollection =
     abstract GetCountry : countryCode:string * countryName:string -> Country
 
 /// [omit]
-type CountryCollection<'T when 'T :> Country> internal (connection: ServiceConnection, regionCodeOpt) = 
-    let items = 
-        seq { let countries = 
-                  match regionCodeOpt with 
-                  | None -> connection.Countries 
+type IDataflowCollection =
+    abstract GetDataflow : dataflowId:string * dataflowName:string -> Dataflow
+
+/// [omit]
+type CountryCollection<'T when 'T :> Country> internal (connection: ServiceConnection, regionCodeOpt) =
+    let items =
+        seq { let countries =
+                  match regionCodeOpt with
+                  | None -> connection.Countries
                   | Some r -> connection.GetCountriesInRegion(r)
-              for country in countries do 
+              for country in countries do
                 if not country.IsRegion then
-                  yield Country(connection, country.Id) :?> 'T }  
+                  yield Country(connection, country.Id) :?> 'T }
     interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
     interface ICountryCollection with member x.GetCountry(countryCode, (*this parameter is only here to help FunScript*)_countryName) = Country(connection, countryCode)
-    
+
+
+/// [omit]
+type DataflowCollection<'T when 'T :> Dataflow> internal (connection: ServiceConnection) =
+    let items =
+        seq { let dataflows = connection.Dataflows
+              for dataflow in dataflows do              
+                  yield Dataflow(connection, dataflow.Id) :?> 'T }
+    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator() // todo how is this useful?
+    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator() // todo how is this useful?
+    interface IDataflowCollection with member x.GetDataflow(dataflowId, (*this parameter is only here to help FunScript*)_dataflowName) = Dataflow(connection, dataflowId)
+
+
 /// [omit]
 type IRegion =
     abstract GetCountries<'T when 'T :> Country> : unit -> CountryCollection<'T>
@@ -327,7 +418,7 @@ type IRegion =
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 /// Metadata for a Region
-type Region internal (connection:ServiceConnection, regionCode:string) = 
+type Region internal (connection:ServiceConnection, regionCode:string) =
     let indicators = new Indicators(connection, regionCode)
     /// Get the WorldBank code for the region
     member x.RegionCode = regionCode
@@ -336,32 +427,32 @@ type Region internal (connection:ServiceConnection, regionCode:string) =
     interface IRegion with
         member x.GetCountries() = CountryCollection(connection,Some regionCode)
         member x.GetIndicators() = indicators
-    
+
 /// [omit]
 type IRegionCollection =
     abstract GetRegion : regionCode:string -> Region
 
 /// [omit]
-type RegionCollection<'T when 'T :> Region> internal (connection: ServiceConnection) = 
-    let items = seq { for (code, _) in connection.Regions -> Region(connection, code) :?> 'T } 
+type RegionCollection<'T when 'T :> Region> internal (connection: ServiceConnection) =
+    let items = seq { for (code, _) in connection.Regions -> Region(connection, code) :?> 'T }
     interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
     interface IRegionCollection with member x.GetRegion(regionCode) = Region(connection, regionCode)
 
 /// [omit]
-type ITopic = 
+type ITopic =
     abstract GetIndicators : unit -> IndicatorsDescriptions
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 /// Metadata for a Topic
-type Topic internal (connection:ServiceConnection, topicCode:string) = 
+type Topic internal (connection:ServiceConnection, topicCode:string) =
     let indicatorsDescriptions = new IndicatorsDescriptions(connection, topicCode)
     /// Get the WorldBank code of the topic
     member x.Code = topicCode
-    /// Get the name of the topic 
+    /// Get the name of the topic
     member x.Name = connection.TopicsIndexed.[topicCode].Name
-    /// Get the description of the topic 
+    /// Get the description of the topic
     member x.Description = connection.TopicsIndexed.[topicCode].Description
     interface ITopic with member x.GetIndicators() = indicatorsDescriptions
 
@@ -370,23 +461,25 @@ type ITopicCollection =
     abstract GetTopic : topicCode:string -> Topic
 
 /// [omit]
-type TopicCollection<'T when 'T :> Topic> internal (connection: ServiceConnection) = 
-    let items = seq { for topic in connection.Topics -> Topic(connection, topic.Id) :?> 'T } 
+type TopicCollection<'T when 'T :> Topic> internal (connection: ServiceConnection) =
+    let items = seq { for topic in connection.Topics -> Topic(connection, topic.Id) :?> 'T }
     interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
     interface ITopicCollection with member x.GetTopic(topicCode) = Topic(connection, topicCode)
 
 /// [omit]
 type ISdmxData =
+    abstract GetDataflows<'T when 'T :> Dataflow> : unit -> seq<'T>
     abstract GetCountries<'T when 'T :> Country> : unit -> seq<'T>
     abstract GetRegions<'T when 'T :> Region> : unit -> seq<'T>
     abstract GetTopics<'T when 'T :> Topic> : unit -> seq<'T>
 
 /// [omit]
-type SdmxData(serviceUrl:string) = 
+type SdmxData(serviceUrl:string) =
     let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
     let connection = new ServiceConnection(restCache, serviceUrl)
     interface ISdmxData with
+        member x.GetDataflows() = DataflowCollection(connection) :> seq<_>
         member x.GetCountries() = CountryCollection(connection, None) :> seq<_>
         member x.GetRegions() = RegionCollection(connection) :> seq<_>
         member x.GetTopics() = TopicCollection(connection) :> seq<_>

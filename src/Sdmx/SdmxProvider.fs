@@ -27,65 +27,77 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
     let cacheDuration = TimeSpan.FromDays 30.0
     let restCache = createInternetFileCache "SdmxSchema" cacheDuration
 
-    let createTypesForWsEntryPoint(sources, worldBankTypeName, asynchronous) = 
+    let createTypesForWsEntryPoint(weEntryPoint, sdmxTypeName, asynchronous) =
 
-        ProviderHelpers.getOrCreateProvidedType cfg this worldBankTypeName <| fun () ->
+        ProviderHelpers.getOrCreateProvidedType cfg this sdmxTypeName <| fun () ->
 
-        // let connection = ServiceConnection(restCache, defaultWsEntryPoint, sources)
- 
-        let resTy = ProvidedTypeDefinition(asm, ns, worldBankTypeName, None, hideObjectMethods = true, nonNullable = true)
+        let connection = ServiceConnection(restCache, weEntryPoint)
 
-        let serviceTypesType = 
+        let resTy = ProvidedTypeDefinition(asm, ns, sdmxTypeName, None, hideObjectMethods = true, nonNullable = true)
+        
+        let serviceTypesType =
             let t = ProvidedTypeDefinition("ServiceTypes", None, hideObjectMethods = true, nonNullable = true)
             t.AddXmlDoc("<summary>Contains the types that describe the data service</summary>")
             resTy.AddMember t
             t
 
-        let countryType =
-            let t = ProvidedTypeDefinition("Country", Some typeof<Country>, hideObjectMethods = true, nonNullable = true)
-            // t.AddMembersDelayed (fun () -> 
-            //     [ let prop = ProvidedProperty("Indicators", indicatorsType, 
-            //                   getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Country) :> ICountry).GetIndicators() @@>))
-            //       prop.AddXmlDoc("<summary>The indicators for the country</summary>")
-            //       yield prop ] )
+        let indicatorsType =
+            let t = ProvidedTypeDefinition("Dimensions", Some typeof<Dimensions>, hideObjectMethods = true, nonNullable = true)
+            t.AddMembersDelayed (fun () -> 
+                [ for dimension in connection.Dimensions do
+                      let indicatorIdVal = dimension.Id
+                      let prop = 
+                          ProvidedProperty
+                            ( dimension.Name, typeof<Dimension>, 
+                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Indicators) :> IIndicators).GetIndicator(indicatorIdVal) @@>))
+
+                      if not (String.IsNullOrEmpty dimension.TestDimension) then prop.AddXmlDoc(dimension.TestDimension)
+                      yield prop ] )
             serviceTypesType.AddMember t
             t
         
-        let countriesType =
-            let countryCollectionType = ProvidedTypeBuilder.MakeGenericType(typedefof<CountryCollection<_>>, [ countryType ])
-            let t = ProvidedTypeDefinition("Countries", Some countryCollectionType, hideObjectMethods = true, nonNullable = true)
-            t.AddMembersDelayed (fun () -> 
-                [ for country in ["A"; "B"; "C"] do
-                    let countryIdVal = "1"
-                    let name = country
-                    let prop = 
+        let dataflowType =
+            let t = ProvidedTypeDefinition("Dataflow", Some typeof<Dataflow>, hideObjectMethods = true, nonNullable = true)
+            t.AddMembersDelayed (fun () ->
+                [ let prop = ProvidedProperty("Dimensions", indicatorsType,
+                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dataflow) :> IDataflow).GetDimensions() @@>))
+                  prop.AddXmlDoc("<summary>The dimensions for the dataflow</summary>")
+                  yield prop ] )
+            serviceTypesType.AddMember t
+            t
+
+        let dataflowsType =
+            let dataflowCollectionType = ProvidedTypeBuilder.MakeGenericType(typedefof<DataflowCollection<_>>, [ dataflowType ])
+            let t = ProvidedTypeDefinition("Dataflows", Some dataflowCollectionType, hideObjectMethods = true, nonNullable = true)
+            t.AddMembersDelayed (fun () ->
+                [ for dataflow in connection.Dataflows do
+                    let prop =
                         ProvidedProperty
-                          ( name, countryType, 
-                            getterCode = (fun (Singleton arg) -> <@@ ((%%arg : CountryCollection<Country>) :> ICountryCollection).GetCountry(countryIdVal, name) @@>))
-                    prop.AddXmlDoc (sprintf "The data for country '%s'" country)
+                          ( dataflow.Name, dataflowType,
+                            getterCode = (fun (Singleton arg) -> <@@ ((%%arg : DataflowCollection<Dataflow>) :> IDataflowCollection).GetDataflow(dataflow.Id, dataflow.Name) @@>))
+                    prop.AddXmlDoc (sprintf "The data for dataflow '%s'" dataflow.Name)
                     yield prop ])
             serviceTypesType.AddMember t
             t
 
         let sdmxDataServiceType =
-            let t = ProvidedTypeDefinition("WorldBankDataService", Some typeof<SdmxData>, hideObjectMethods = true, nonNullable = true)
-            t.AddMembersDelayed (fun () -> 
-                [ yield ProvidedProperty("Countries", countriesType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetCountries() @@>)) ])
+            let t = ProvidedTypeDefinition("SdmxDataService", Some typeof<SdmxData>, hideObjectMethods = true, nonNullable = true)
+            t.AddMembersDelayed (fun () ->
+                [ yield ProvidedProperty("Dataflows", dataflowsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDataflows() @@>)) ])
             serviceTypesType.AddMember t
             t
 
-        resTy.AddMembersDelayed (fun () -> 
-            [ let urlVal = sources              
-              yield ProvidedMethod ("GetDataContext", [], sdmxDataServiceType, isStatic=true,
-                                       invokeCode = (fun _ -> <@@ SdmxData(urlVal) @@>)) 
+        resTy.AddMembersDelayed (fun () ->
+            [ let urlVal = weEntryPoint
+              yield ProvidedMethod ("GetDataContext", [], sdmxDataServiceType, isStatic=true,invokeCode = (fun _ -> <@@ SdmxData(urlVal) @@>))
             ])
 
         resTy
-    
-    let paramSdmxType = 
+
+    let paramSdmxType =
         let sdmxProvTy = ProvidedTypeDefinition(asm, ns, "SdmxDataProvider", None, hideObjectMethods = true, nonNullable = true)
-        
-        let defaultSourcesStr = ""        
+
+        let defaultSourcesStr = ""
         let helpText = "<summary>.. Sdmx Type Provider .. </summary>
                         <param name='WsEntryPoint'>Sdmx rest web service entry point url</param>
                         <param name='Asynchronous'>Generate asynchronous calls. Defaults to false.</param>"
@@ -96,14 +108,14 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             [ ProvidedStaticParameter("WsEntryPoint", typeof<string>, defaultSourcesStr)
               ProvidedStaticParameter("Asynchronous", typeof<bool>, false) ]
 
-        sdmxProvTy.DefineStaticParameters(parameters, fun typeName providerArgs -> 
+        sdmxProvTy.DefineStaticParameters(parameters, fun typeName providerArgs ->
             let wsEntryPoint = (providerArgs.[0] :?> string)
             let isAsync = providerArgs.[1] :?> bool
             createTypesForWsEntryPoint(wsEntryPoint, typeName, isAsync))
         sdmxProvTy
 
     // let createStaticProp propertyName = ProvidedProperty(propertyName = propertyName, propertyType = typeof<string>, isStatic = true, getterCode = (fun args -> <@@ "Hello!" @@>))
-                              
+
     // Register the main type with F# compiler
     do this.AddNamespace(ns, [ paramSdmxType ])
 
