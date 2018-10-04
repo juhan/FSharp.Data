@@ -41,7 +41,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             resTy.AddMember t
             t
 
-        let indicatorsType =
+        let dimensionsType =
             let t = ProvidedTypeDefinition("Dimensions", Some typeof<Dimensions>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () -> 
                 [ for dimension in connection.Dimensions do
@@ -59,7 +59,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
         let dataflowType =
             let t = ProvidedTypeDefinition("Dataflow", Some typeof<Dataflow>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () ->
-                [ let prop = ProvidedProperty("Dimensions", indicatorsType,
+                [ let prop = ProvidedProperty("Dimensions", dimensionsType,
                               getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dataflow) :> IDataflow).GetDimensions() @@>))
                   prop.AddXmlDoc("<summary>The dimensions for the dataflow</summary>")
                   yield prop ] )
@@ -83,7 +83,10 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
         let sdmxDataServiceType =
             let t = ProvidedTypeDefinition("SdmxDataService", Some typeof<SdmxData>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () ->
-                [ yield ProvidedProperty("Dataflows", dataflowsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDataflows() @@>)) ])
+                [ // TODO add for loop to Dataflows
+                    yield ProvidedProperty("Dataflows", dataflowsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDataflows() @@>))
+                    yield ProvidedProperty("1DF1", dimensionsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDimensions() @@>))  // TODO pass param dataflow id
+                    ])
             serviceTypesType.AddMember t
             t
 

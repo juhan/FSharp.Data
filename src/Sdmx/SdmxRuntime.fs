@@ -409,6 +409,18 @@ type DataflowCollection<'T when 'T :> Dataflow> internal (connection: ServiceCon
     interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator() // todo how is this useful?
     interface IDataflowCollection with member x.GetDataflow(dataflowId, (*this parameter is only here to help FunScript*)_dataflowName) = Dataflow(connection, dataflowId)
 
+/// [omit]
+type DimensionCollection<'T when 'T :> Dimension> internal (connection: ServiceConnection) =
+    let items =
+        seq { let dimensions = connection.Dimensions
+              for dimension in dimensions do
+                  let dataflowId = "1"
+                  let dimensionId = "2"              
+                  yield Dimension(connection, dataflowId, dimensionId) :?> 'T }
+    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator() // todo how is this useful?
+    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator() // todo how is this useful?
+    interface IDataflowCollection with member x.GetDataflow(dataflowId, (*this parameter is only here to help FunScript*)_dataflowName) = Dataflow(connection, dataflowId)
+
 
 /// [omit]
 type IRegion =
@@ -470,6 +482,7 @@ type TopicCollection<'T when 'T :> Topic> internal (connection: ServiceConnectio
 /// [omit]
 type ISdmxData =
     abstract GetDataflows<'T when 'T :> Dataflow> : unit -> seq<'T>
+    abstract GetDimensions<'T when 'T :> Dimension> : unit -> seq<'T>
     abstract GetCountries<'T when 'T :> Country> : unit -> seq<'T>
     abstract GetRegions<'T when 'T :> Region> : unit -> seq<'T>
     abstract GetTopics<'T when 'T :> Topic> : unit -> seq<'T>
@@ -480,6 +493,7 @@ type SdmxData(serviceUrl:string) =
     let connection = new ServiceConnection(restCache, serviceUrl)
     interface ISdmxData with
         member x.GetDataflows() = DataflowCollection(connection) :> seq<_>
+        member x.GetDimensions() = DimensionCollection(connection) :> seq<_>
         member x.GetCountries() = CountryCollection(connection, None) :> seq<_>
         member x.GetRegions() = RegionCollection(connection) :> seq<_>
         member x.GetTopics() = TopicCollection(connection) :> seq<_>
