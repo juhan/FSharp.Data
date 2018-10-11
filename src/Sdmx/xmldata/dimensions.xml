@@ -1,0 +1,84 @@
+<DataStructures xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure">
+    <DataStructure id="WDI" urn="urn:sdmx:org.sdmx.infomodel.datastructure.DataStructure=WB:WDI(1.0)" agencyID="WB" version="1.0" isFinal="true">
+        <Name xml:lang="en" 
+            xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">World Development Indicators
+        </Name>
+        <DataStructureComponents>
+            <DimensionList id="DimensionDescriptor" urn="urn:sdmx:org.sdmx.infomodel.datastructure.DimensionDescriptor=WB:WDI(1.0).DimensionDescriptor">
+                <Dimension id="FREQ" urn="urn:sdmx:org.sdmx.infomodel.datastructure.Dimension=WB:WDI(1.0).FREQ" position="1">
+                    <ConceptIdentity>
+                        <Ref id="FREQ" maintainableParentID="WDI_CONCEPT" maintainableParentVersion="1.0" agencyID="WB" package="conceptscheme" class="Concept" 
+                            xmlns="" />
+                    </ConceptIdentity>
+                    <LocalRepresentation>
+                        <Enumeration>
+                            <Ref id="CL_FREQ_WDI" version="1.0" agencyID="WB" package="codelist" class="Codelist" 
+                                xmlns="" />
+                        </Enumeration>
+                    </LocalRepresentation>
+                </Dimension>
+                <Dimension id="SERIES" urn="urn:sdmx:org.sdmx.infomodel.datastructure.Dimension=WB:WDI(1.0).SERIES" position="2">
+                    <ConceptIdentity>
+                        <Ref id="SERIES" maintainableParentID="WDI_CONCEPT" maintainableParentVersion="1.0" agencyID="WB" package="conceptscheme" class="Concept" 
+                            xmlns="" />
+                    </ConceptIdentity>
+                    <LocalRepresentation>
+                        <Enumeration>
+                            <Ref id="CL_SERIES_WDI" version="1.0" agencyID="WB" package="codelist" class="Codelist" 
+                                xmlns="" />
+                        </Enumeration>
+                    </LocalRepresentation>
+                </Dimension>
+                <Dimension id="REF_AREA" urn="urn:sdmx:org.sdmx.infomodel.datastructure.Dimension=WB:WDI(1.0).REF_AREA" position="3">
+                    <ConceptIdentity>
+                        <Ref id="REF_AREA" maintainableParentID="WDI_CONCEPT" maintainableParentVersion="1.0" agencyID="WB" package="conceptscheme" class="Concept" 
+                            xmlns="" />
+                    </ConceptIdentity>
+                    <LocalRepresentation>
+                        <Enumeration>
+                            <Ref id="CL_REF_AREA_WDI" version="1.0" agencyID="WB" package="codelist" class="Codelist" 
+                                xmlns="" />
+                        </Enumeration>
+                    </LocalRepresentation>
+                </Dimension>
+                <TimeDimension id="TIME_PERIOD" urn="urn:sdmx:org.sdmx.infomodel.datastructure.TimeDimension=WB:WDI(1.0).TIME_PERIOD" position="4">
+                    <ConceptIdentity>
+                        <Ref id="TIME_PERIOD" maintainableParentID="WDI_CONCEPT" maintainableParentVersion="1.0" agencyID="WB" package="conceptscheme" class="Concept" 
+                            xmlns="" />
+                    </ConceptIdentity>
+                    <LocalRepresentation>
+                        <TextFormat textType="ObservationalTimePeriod" />
+                    </LocalRepresentation>
+                </TimeDimension>
+            </DimensionList>
+            <AttributeList id="AttributeDescriptor" urn="urn:sdmx:org.sdmx.infomodel.datastructure.AttributeDescriptor=WB:WDI(1.0).AttributeDescriptor">
+                <Attribute id="UNIT_MULT" urn="urn:sdmx:org.sdmx.infomodel.datastructure.DataAttribute=WB:WDI(1.0).UNIT_MULT" assignmentStatus="Mandatory">
+                    <ConceptIdentity>
+                        <Ref id="UNIT_MULT" maintainableParentID="WDI_CONCEPT" maintainableParentVersion="1.0" agencyID="WB" package="conceptscheme" class="Concept" 
+                            xmlns="" />
+                    </ConceptIdentity>
+                    <LocalRepresentation>
+                        <Enumeration>
+                            <Ref id="CL_UNIT_MULT_WDI" version="1.0" agencyID="WB" package="codelist" class="Codelist" 
+                                xmlns="" />
+                        </Enumeration>
+                    </LocalRepresentation>
+                    <AttributeRelationship>
+                        <PrimaryMeasure>
+                            <Ref id="OBS_VALUE" 
+                                xmlns="" />
+                        </PrimaryMeasure>
+                    </AttributeRelationship>
+                </Attribute>
+            </AttributeList>
+            <MeasureList id="MeasureDescriptor" urn="urn:sdmx:org.sdmx.infomodel.datastructure.MeasureDescriptor=WB:WDI(1.0).MeasureDescriptor">
+                <PrimaryMeasure id="OBS_VALUE" urn="urn:sdmx:org.sdmx.infomodel.datastructure.PrimaryMeasure=WB:WDI(1.0).OBS_VALUE">
+                    <ConceptIdentity>
+                        <Ref id="OBS_VALUE" maintainableParentID="WDI_CONCEPT" maintainableParentVersion="1.0" agencyID="WB" package="conceptscheme" class="Concept" 
+                            xmlns="" />
+                    </ConceptIdentity>
+                </PrimaryMeasure>
+            </MeasureList>
+        </DataStructureComponents>
+    </DataStructure>
+</DataStructures>

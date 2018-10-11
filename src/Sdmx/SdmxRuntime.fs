@@ -286,7 +286,7 @@ type Indicator internal (connection:ServiceConnection, countryOrRegionCode:strin
 type Dimension internal (connection:ServiceConnection, dimensionId:string) =    
     member x.Id = dimensionId
     member x.Name = connection.DimensionsIndexed.[dimensionId].Id
-
+    member x.Description = "Test"
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
@@ -310,7 +310,6 @@ type IIndicators =
 
 /// [omit]
 type IDimensions =
-    abstract GetDimensions : dimensionId:string -> Dimensions
     abstract GetDimension : dimensionId:string -> Dimension
     abstract AsyncGetDimension : dimensionId:string -> Async<Dimension>
 

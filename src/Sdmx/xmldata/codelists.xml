@@ -1,0 +1,37 @@
+<Codelists xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure">
+    <Codelist id="CL_FREQ_WDI" urn="urn:sdmx:org.sdmx.infomodel.codelist.Codelist=WB:CL_FREQ_WDI(1.0)" agencyID="WB" version="1.0" isFinal="true">
+        <Name xml:lang="en" 
+            xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">Frequency code list
+        </Name>
+        <Code id="A" urn="urn:sdmx:org.sdmx.infomodel.codelist.Code=WB:CL_FREQ_WDI(1.0).A">
+            <Name xml:lang="en" 
+                xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">Annual
+            </Name>
+        </Code>
+        <Code id="2A" urn="urn:sdmx:org.sdmx.infomodel.codelist.Code=WB:CL_FREQ_WDI(1.0).2A">
+            <Name xml:lang="en" 
+                xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">Two-year average
+            </Name>
+        </Code>
+        <Code id="3A" urn="urn:sdmx:org.sdmx.infomodel.codelist.Code=WB:CL_FREQ_WDI(1.0).3A">
+            <Name xml:lang="en" 
+                xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">Three-year average
+            </Name>
+        </Code>
+        <Code id="S" urn="urn:sdmx:org.sdmx.infomodel.codelist.Code=WB:CL_FREQ_WDI(1.0).S">
+            <Name xml:lang="en" 
+                xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">Half-yearly, semester
+            </Name>
+        </Code>
+        <Code id="Q" urn="urn:sdmx:org.sdmx.infomodel.codelist.Code=WB:CL_FREQ_WDI(1.0).Q">
+            <Name xml:lang="en" 
+                xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">Quarterly
+            </Name>
+        </Code>
+        <Code id="M" urn="urn:sdmx:org.sdmx.infomodel.codelist.Code=WB:CL_FREQ_WDI(1.0).M">
+            <Name xml:lang="en" 
+                xmlns="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common">Monthly
+            </Name>
+        </Code>
+    </Codelist>
+</Codelists>
