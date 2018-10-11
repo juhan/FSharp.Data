@@ -29,8 +29,8 @@ module Implementation =
 
     type internal DimensionRecord =
         { Id : string
-          Name: string
-          TestDimension : string}
+          EnumerationId: string
+          Position: string}
 
     type internal CountryRecord =
         { Id : string
@@ -42,7 +42,8 @@ module Implementation =
     type internal DataflowRecord =
         { Id : string
           Name : string 
-          Test: string }
+          AgencyID: string
+          Version: string }
 
     type internal TopicRecord =
         { Id : string
@@ -122,12 +123,14 @@ module Implementation =
 
         let getDimensions() =
             async { return
-                        [ for dimension in [("1", "D1"); ("2", "D2")] do
-                            let (id, name) = dimension
+                        [ for dimension in [("FREQ", "CL_FREQ_WDI", "1"); 
+                                            ("SERIES", "CL_SERIES_WDI", "2");
+                                            ("REF_AREA", "CL_REF_AREA_WDI", "3");
+                                            ] do
+                            let (id, enumerationId, position) = dimension
                             yield { Id = id
-                                    Name = name
-                                    TestDimension = "TestDimension" } ] }
-  
+                                    EnumerationId = enumerationId
+                                    Position = position } ] }
         let getTopics() =
             async { let! docs = getDocuments ["topic"] [] 1 1
                     return
@@ -155,11 +158,14 @@ module Implementation =
                                         Region = region } ] }
         let getDataflows(args) =
             async { return
-                        [ for dataflow in [("1", "Dataflow1"); ("2", "Dataflow2")] do
-                            let (id, name) = dataflow
+                        [ for dataflow in [
+                            ("SDG", "SDG", "UNSD", "0.4"); 
+                            ("WDI", "World Development Indicators", "WB", "1.0")] do
+                            let (id, name, agencyId, version) = dataflow
                             yield { Id = id
                                     Name = name
-                                    Test = "test"} ] }
+                                    AgencyID = agencyId
+                                    Version = version} ] }
         let getRegions() =
             async { let! docs = getDocuments ["region"] [] 1 1
                     return
@@ -180,7 +186,7 @@ module Implementation =
         let topics = lazy (getTopics() |> Async.RunSynchronously)
         let topicsIndexed = lazy (topics.Force() |> Seq.map (fun t -> t.Id, t) |> dict)
         let indicators = lazy (getIndicators() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Name) |> Seq.toList)
-        let dimensions = lazy (getDimensions() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Name) |> Seq.toList)
+        let dimensions = lazy (getDimensions() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Id) |> Seq.toList)
         let indicatorsIndexed = lazy (indicators.Force() |> Seq.map (fun i -> i.Id, i) |> dict)
         let dimensionsIndexed = lazy (dimensions.Force() |> Seq.map (fun i -> i.Id, i) |> dict)
         let indicatorsByTopic = lazy (
@@ -277,10 +283,9 @@ type Indicator internal (connection:ServiceConnection, countryOrRegionCode:strin
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 /// Dimension data
-type Dimension internal (connection:ServiceConnection, dataflowId:string, dimensionId:string) =
-    member x.DataflowId = dataflowId
+type Dimension internal (connection:ServiceConnection, dimensionId:string) =    
     member x.Id = dimensionId
-    member x.Name = connection.IndicatorsIndexed.[dimensionId].Name
+    member x.Name = connection.DimensionsIndexed.[dimensionId].Id
 
 
 [<DebuggerDisplay("{Name}")>]
@@ -305,6 +310,7 @@ type IIndicators =
 
 /// [omit]
 type IDimensions =
+    abstract GetDimensions : dimensionId:string -> Dimensions
     abstract GetDimension : dimensionId:string -> Dimension
     abstract AsyncGetDimension : dimensionId:string -> Async<Dimension>
 
@@ -320,10 +326,10 @@ type Indicators internal (connection:ServiceConnection, countryOrRegionCode) =
 
 /// [omit]
 type Dimensions internal (connection:ServiceConnection, dataflowId) =
-    let dimensions = seq { for dimension in connection.Dimensions -> Dimension(connection, dataflowId, dimension.Id) }
+    let dimensions = seq { for dimension in connection.Dimensions -> Dimension(connection, dimension.Id) }
     interface IDimensions with
-        member x.GetDimension(dimensionId) = Dimension(connection, dataflowId, dimensionId)
-        member x.AsyncGetDimension(dimensionId) = async { return Dimension(connection, dataflowId, dimensionId) }
+        member x.GetDimension(dimensionId) = Dimension(connection, dimensionId)
+        member x.AsyncGetDimension(dimensionId) = async { return Dimension(connection, dimensionId) }
     interface seq<Dimension> with member x.GetEnumerator() = dimensions.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = dimensions.GetEnumerator() :> _
 
@@ -371,7 +377,7 @@ type Dataflow internal (connection:ServiceConnection, dataflowId:string) =
     /// Get the WorldBank code of the country
     member x.Id = dataflowId
     /// Get the name of the country
-    member x.Name = connection.DataflowsIndexed.[dataflowId].Name
+    // member x.Name = connection.DataflowsIndexed.[dataflowId].Name
     interface IDataflow with member x.GetDimensions() = dimensions
 
 
@@ -383,6 +389,11 @@ type ICountryCollection =
 /// [omit]
 type IDataflowCollection =
     abstract GetDataflow : dataflowId:string * dataflowName:string -> Dataflow
+
+
+/// [omit]
+type IDimensionCollection =
+    abstract GetDimension : dimensionId:string -> Dimension
 
 /// [omit]
 type CountryCollection<'T when 'T :> Country> internal (connection: ServiceConnection, regionCodeOpt) =
@@ -405,8 +416,8 @@ type DataflowCollection<'T when 'T :> Dataflow> internal (connection: ServiceCon
         seq { let dataflows = connection.Dataflows
               for dataflow in dataflows do              
                   yield Dataflow(connection, dataflow.Id) :?> 'T }
-    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator() // todo how is this useful?
-    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator() // todo how is this useful?
+    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
+    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
     interface IDataflowCollection with member x.GetDataflow(dataflowId, (*this parameter is only here to help FunScript*)_dataflowName) = Dataflow(connection, dataflowId)
 
 /// [omit]
@@ -414,12 +425,11 @@ type DimensionCollection<'T when 'T :> Dimension> internal (connection: ServiceC
     let items =
         seq { let dimensions = connection.Dimensions
               for dimension in dimensions do
-                  let dataflowId = "1"
-                  let dimensionId = "2"              
-                  yield Dimension(connection, dataflowId, dimensionId) :?> 'T }
-    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator() // todo how is this useful?
-    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator() // todo how is this useful?
-    interface IDataflowCollection with member x.GetDataflow(dataflowId, (*this parameter is only here to help FunScript*)_dataflowName) = Dataflow(connection, dataflowId)
+                  let dimensionId = dimension.Id   
+                  yield Dimension(connection, dimensionId) :?> 'T }
+    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
+    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
+    interface IDimensionCollection with member x.GetDimension(dimensionId) = Dimension(connection, dimensionId)
 
 
 /// [omit]

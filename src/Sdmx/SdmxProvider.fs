@@ -28,8 +28,11 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
     let restCache = createInternetFileCache "SdmxSchema" cacheDuration
 
     let createTypesForWsEntryPoint(weEntryPoint, sdmxTypeName, asynchronous) =
+        
+        printfn "createTypesForWsEntryPoint>weEntryPoint-------- %s --------" weEntryPoint
+        printfn "createTypesForWsEntryPoint>sdmxTypeName-------- %s --------" sdmxTypeName
 
-        ProviderHelpers.getOrCreateProvidedType cfg this sdmxTypeName <| fun () ->
+        // ProviderHelpers.getOrCreateProvidedType cfg this sdmxTypeName <| fun () ->
 
         let connection = ServiceConnection(restCache, weEntryPoint)
 
@@ -45,13 +48,13 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             let t = ProvidedTypeDefinition("Dimensions", Some typeof<Dimensions>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () -> 
                 [ for dimension in connection.Dimensions do
-                      let indicatorIdVal = dimension.Id
+                      let enumerationId = dimension.EnumerationId
                       let prop = 
                           ProvidedProperty
-                            ( dimension.Name, typeof<Dimension>, 
-                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Indicators) :> IIndicators).GetIndicator(indicatorIdVal) @@>))
+                            ( dimension.Id, typeof<Dimension>, 
+                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(enumerationId) @@>))
 
-                      if not (String.IsNullOrEmpty dimension.TestDimension) then prop.AddXmlDoc(dimension.TestDimension)
+                      if not (String.IsNullOrEmpty dimension.Position) then prop.AddXmlDoc(dimension.Position)
                       yield prop ] )
             serviceTypesType.AddMember t
             t
@@ -83,10 +86,9 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
         let sdmxDataServiceType =
             let t = ProvidedTypeDefinition("SdmxDataService", Some typeof<SdmxData>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () ->
-                [ // TODO add for loop to Dataflows
+                [ 
                     yield ProvidedProperty("Dataflows", dataflowsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDataflows() @@>))
-                    yield ProvidedProperty("1DF1", dimensionsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDimensions() @@>))  // TODO pass param dataflow id
-                    ])
+                ])
             serviceTypesType.AddMember t
             t
 
@@ -102,7 +104,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
 
         let defaultSourcesStr = ""
         let helpText = "<summary>.. Sdmx Type Provider .. </summary>
-                        <param name='WsEntryPoint'>Sdmx rest web service entry point url</param>
+                        <param name='WsEntryPoint'>Sdmx rest web service entry point url.</param>
                         <param name='Asynchronous'>Generate asynchronous calls. Defaults to false.</param>"
 
         sdmxProvTy.AddXmlDoc(helpText)
@@ -112,8 +114,15 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
               ProvidedStaticParameter("Asynchronous", typeof<bool>, false) ]
 
         sdmxProvTy.DefineStaticParameters(parameters, fun typeName providerArgs ->
+            
+            printfn "paramSdmxType>typeName-------- %s --------" typeName
+
             let wsEntryPoint = (providerArgs.[0] :?> string)
             let isAsync = providerArgs.[1] :?> bool
+            
+            printfn "paramSdmxType>wsEntryPoint-------- %s --------" wsEntryPoint
+            printfn "paramSdmxType>isAsync-------- %b --------" isAsync
+
             createTypesForWsEntryPoint(wsEntryPoint, typeName, isAsync))
         sdmxProvTy
 
