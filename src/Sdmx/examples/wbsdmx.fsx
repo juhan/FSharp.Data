@@ -6,7 +6,7 @@ type SD = SdmxDataProvider<"https://api.worldbank.org/v2/sdmx/rest">
 
 let wb = SD.GetDataContext()
 
-wb.Dataflows.SDG.Dimensions.FREQ
+wb.Dataflows.``World Development Indicators``.FREQ.Annual.
 
 
 // SdmxDataProvider<"World Development Indicators", Asynchronous=true>

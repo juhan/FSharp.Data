@@ -43,29 +43,34 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             t.AddXmlDoc("<summary>Contains the types that describe the data service</summary>")
             resTy.AddMember t
             t
+        let rec dimensionValueType =
+            let t = ProvidedTypeDefinition("DimensionValue", Some typeof<DimensionValue>, hideObjectMethods = true, nonNullable = true)
+            t.AddMembersDelayed (fun () -> 
+                [ for dimension in connection.Dimensions do
+                      let enumerationId = dimension.EnumerationId
+                      let prop = 
+                          ProvidedProperty
+                            ( dimension.Id, dimensionType, 
+                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(enumerationId) @@>))
 
-        let dimensionValueType = 
-            let t = ProvidedTypeDefinition("DimensionsValues", Some typeof<DimensionValue>, hideObjectMethods = true, nonNullable = true)
+                      if not (String.IsNullOrEmpty dimension.Position) then prop.AddXmlDoc(dimension.Position)
+                      yield prop                     
+                      ])
+            serviceTypesType.AddMember t
+            t 
+        
+        and dimensionType = 
+            let t = ProvidedTypeDefinition("Dimension", Some typeof<Dimension>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () -> 
                 [ for dimension in connection.DimensionValues do
                     let prop = 
                           ProvidedProperty
-                            ( dimension.Name, typeof<DimensionValue>, 
+                            ( dimension.Name, dimensionValueType, 
                               getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(dimension.Id) @@>))
                     if not (String.IsNullOrEmpty dimension.Name) then prop.AddXmlDoc(dimension.Name)
                     yield prop ])
             serviceTypesType.AddMember t
-            t
-
-        // let rec dimensionType =
-        //     let t = ProvidedTypeDefinition("Dimension", Some typeof<Dimension>, hideObjectMethods = true, nonNullable = true)
-        //     t.AddMembersDelayed (fun () ->
-        //         [ let prop = ProvidedProperty("Dimensions", dimensionsType,
-        //                       getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension("1") @@>))
-        //           prop.AddXmlDoc("<summary>The indicators for the country</summary>")
-        //           yield prop ] )
-        //     serviceTypesType.AddMember t
-        //     t
+            t        
 
         let dimensionsType =
             let t = ProvidedTypeDefinition("Dimensions", Some typeof<Dimensions>, hideObjectMethods = true, nonNullable = true)
@@ -74,7 +79,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                       let enumerationId = dimension.EnumerationId
                       let prop = 
                           ProvidedProperty
-                            ( dimension.Id, dimensionValueType, 
+                            ( dimension.Id, dimensionType, 
                               getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(enumerationId) @@>))
 
                       if not (String.IsNullOrEmpty dimension.Position) then prop.AddXmlDoc(dimension.Position)
@@ -100,7 +105,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                 [ for dataflow in connection.Dataflows do
                     let prop =
                         ProvidedProperty
-                          ( dataflow.Name, dataflowType,
+                          ( dataflow.Name, dimensionsType,
                             getterCode = (fun (Singleton arg) -> <@@ ((%%arg : DataflowCollection<Dataflow>) :> IDataflowCollection).GetDataflow(dataflow.Id, dataflow.Name) @@>))
                     prop.AddXmlDoc (sprintf "The data for dataflow '%s'" dataflow.Name)
                     yield prop ])

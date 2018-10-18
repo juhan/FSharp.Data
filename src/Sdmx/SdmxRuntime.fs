@@ -261,10 +261,7 @@ module Implementation =
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 type DimensionValue internal (connection:ServiceConnection, dimensionId:string) =    
-
     member x.Id = dimensionId
-    member x.Name = connection.DimensionsIndexed.[dimensionId].Id
-    member x.Description = "Test"
 
 /// [omit]
 type IDimensionValue =
