@@ -32,6 +32,10 @@ module Implementation =
           EnumerationId: string
           Position: string}
 
+    type internal DimensionValueRecord =
+        { Id : string
+          Name: string}
+
     type internal CountryRecord =
         { Id : string
           Name : string
@@ -131,6 +135,20 @@ module Implementation =
                             yield { Id = id
                                     EnumerationId = enumerationId
                                     Position = position } ] }
+
+        let getDimensionValues() =
+            async { return
+                        [ for dimensionValue in [("A", "Annual"); 
+                                                ("2A", "Two-year average");
+                                                ("3A", "Three-year average");
+                                                ("S", "Half-yearly, semester");
+                                                ("Q", "Quarterly");
+                                                ("M", "Monthly");
+                                                ] do
+                            let (id, name) = dimensionValue
+                            yield { Id = id
+                                    Name = name} ] }
+
         let getTopics() =
             async { let! docs = getDocuments ["topic"] [] 1 1
                     return
@@ -187,6 +205,7 @@ module Implementation =
         let topicsIndexed = lazy (topics.Force() |> Seq.map (fun t -> t.Id, t) |> dict)
         let indicators = lazy (getIndicators() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Name) |> Seq.toList)
         let dimensions = lazy (getDimensions() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Id) |> Seq.toList)
+        let dimensionValues = lazy (getDimensionValues() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Id) |> Seq.toList)
         let indicatorsIndexed = lazy (indicators.Force() |> Seq.map (fun i -> i.Id, i) |> dict)
         let dimensionsIndexed = lazy (dimensions.Force() |> Seq.map (fun i -> i.Id, i) |> dict)
         let indicatorsByTopic = lazy (
@@ -208,6 +227,8 @@ module Implementation =
         member internal __.IndicatorsIndexed = indicatorsIndexed.Force()
         member internal __.Dimensions = dimensions.Force()
         member internal __.DimensionsIndexed = dimensionsIndexed.Force()
+        member internal __.DimensionValues = dimensionValues.Force()
+        
         member internal __.IndicatorsByTopic = indicatorsByTopic.Force()
         member internal __.Countries = countries.Force()
         member internal __.CountriesIndexed = countriesIndexed.Force()
@@ -236,64 +257,35 @@ module Implementation =
              x.GetDataAsync(countryOrRegionCode, indicatorCode) |> Async.RunSynchronously
         member internal __.GetCountriesInRegion region = getCountries ["region", region] |> Async.RunSynchronously
 
+
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
-/// Indicator data
-type Indicator internal (connection:ServiceConnection, countryOrRegionCode:string, indicatorCode:string) =
-    let data = connection.GetData(countryOrRegionCode, indicatorCode) |> Seq.cache
-    let dataDict = lazy (dict data)
+type DimensionValue internal (connection:ServiceConnection, dimensionId:string) =    
 
-    /// Get the code for the country or region of the indicator
-    member x.Code = countryOrRegionCode
-
-    /// Get the code for the indicator
-    member x.IndicatorCode = indicatorCode
-
-    /// Get the name of the indicator
-    member x.Name = connection.IndicatorsIndexed.[indicatorCode].Name
-
-    /// Get the source of the indicator
-    member x.Source = connection.IndicatorsIndexed.[indicatorCode].Source
-
-    /// Get the description of the indicator
-    member x.Description = connection.IndicatorsIndexed.[indicatorCode].Description
-
-    /// Get the indicator value for the given year. If there's no data for that year, NaN is returned
-    member x.Item
-        with get year =
-            match dataDict.Force().TryGetValue year with
-            | true, value -> value
-            | _ -> Double.NaN
-
-    /// Get the indicator value for the given year, if present
-    member x.TryGetValueAt year =
-        match dataDict.Force().TryGetValue year with
-        | true, value -> Some value
-        | _ -> None
-
-    /// Get the years for which the indicator has values
-    member x.Years = dataDict.Force().Keys
-
-    /// Get the values for the indicator (without years)
-    member x.Values = dataDict.Force().Values
-
-    interface seq<int * float> with member x.GetEnumerator() = data.GetEnumerator()
-    interface IEnumerable with member x.GetEnumerator() = (data.GetEnumerator() :> _)
+    member x.Id = dimensionId
+    member x.Name = connection.DimensionsIndexed.[dimensionId].Id
+    member x.Description = "Test"
 
 /// [omit]
 type IDimensionValue =
-    abstract GetIndicator : indicatorCode:string -> Indicator
-    abstract AsyncGetIndicator : indicatorCode:string -> Async<Indicator>
-
+    abstract GetDimensionValue : indicatorCode:string -> DimensionValue
+    abstract AsyncGetDimensionValue : indicatorCode:string -> Async<DimensionValue>
+    
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 /// Dimension data
 type Dimension internal (connection:ServiceConnection, dimensionId:string) =    
-
+    let dimensionValues = seq { for dimensionValue in connection.DimensionValues -> DimensionValue(connection, dimensionValue.Id) }
     member x.Id = dimensionId
     member x.Name = connection.DimensionsIndexed.[dimensionId].Id
     member x.Description = "Test"
+    
+    interface IDimensionValue with
+        member x.GetDimensionValue(dimensionId) = DimensionValue(connection, dimensionId)
+        member x.AsyncGetDimensionValue(dimensionId) = async { return DimensionValue(connection, dimensionId) }
+    interface seq<DimensionValue> with member x.GetEnumerator() = dimensionValues.GetEnumerator()
+    interface IEnumerable with member x.GetEnumerator() = dimensionValues.GetEnumerator() :> _
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
@@ -317,6 +309,7 @@ type IDimensions =
 
 /// [omit]
 type Dimensions internal (connection:ServiceConnection, dataflowId) =
+    // TODO filter by dataflowId
     let dimensions = seq { for dimension in connection.Dimensions -> Dimension(connection, dimension.Id) }
     interface IDimensions with
         member x.GetDimension(dimensionId) = Dimension(connection, dimensionId)

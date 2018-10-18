@@ -44,6 +44,19 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             resTy.AddMember t
             t
 
+        let dimensionType = 
+            let t = ProvidedTypeDefinition("DimensionsValues", Some typeof<DimensionValue>, hideObjectMethods = true, nonNullable = true)
+            t.AddMembersDelayed (fun () -> 
+                [ for dimension in connection.DimensionValues do
+                    let prop = 
+                          ProvidedProperty
+                            ( dimension.Name, typeof<DimensionValue>, 
+                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(dimension.Id) @@>))
+                    if not (String.IsNullOrEmpty dimension.Name) then prop.AddXmlDoc(dimension.Name)
+                    yield prop ])
+            serviceTypesType.AddMember t
+            t
+
         let dimensionsType =
             let t = ProvidedTypeDefinition("Dimensions", Some typeof<Dimensions>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () -> 
@@ -51,11 +64,11 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                       let enumerationId = dimension.EnumerationId
                       let prop = 
                           ProvidedProperty
-                            ( dimension.Id, typeof<Dimension>, 
+                            ( dimension.Id, dimensionType, 
                               getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(enumerationId) @@>))
 
                       if not (String.IsNullOrEmpty dimension.Position) then prop.AddXmlDoc(dimension.Position)
-                      yield prop ] )
+                      yield prop ])
             serviceTypesType.AddMember t
             t
         
