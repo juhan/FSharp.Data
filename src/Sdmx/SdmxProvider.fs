@@ -44,7 +44,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             resTy.AddMember t
             t
 
-        let dimensionType = 
+        let dimensionValueType = 
             let t = ProvidedTypeDefinition("DimensionsValues", Some typeof<DimensionValue>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () -> 
                 [ for dimension in connection.DimensionValues do
@@ -57,6 +57,16 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             serviceTypesType.AddMember t
             t
 
+        // let rec dimensionType =
+        //     let t = ProvidedTypeDefinition("Dimension", Some typeof<Dimension>, hideObjectMethods = true, nonNullable = true)
+        //     t.AddMembersDelayed (fun () ->
+        //         [ let prop = ProvidedProperty("Dimensions", dimensionsType,
+        //                       getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension("1") @@>))
+        //           prop.AddXmlDoc("<summary>The indicators for the country</summary>")
+        //           yield prop ] )
+        //     serviceTypesType.AddMember t
+        //     t
+
         let dimensionsType =
             let t = ProvidedTypeDefinition("Dimensions", Some typeof<Dimensions>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () -> 
@@ -64,11 +74,12 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                       let enumerationId = dimension.EnumerationId
                       let prop = 
                           ProvidedProperty
-                            ( dimension.Id, dimensionType, 
+                            ( dimension.Id, dimensionValueType, 
                               getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(enumerationId) @@>))
 
                       if not (String.IsNullOrEmpty dimension.Position) then prop.AddXmlDoc(dimension.Position)
-                      yield prop ])
+                      yield prop                     
+                      ])
             serviceTypesType.AddMember t
             t
         
