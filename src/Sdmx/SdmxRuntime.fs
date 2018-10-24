@@ -28,7 +28,8 @@ module Implementation =
           Description : string }
 
     type internal DimensionRecord =
-        { Id : string
+        { AgencyId : string
+          Id : string
           EnumerationId: string
           Position: string}
 
@@ -54,15 +55,15 @@ module Implementation =
           Name : string
           Description : string }
 
-    type internal ServiceConnection(restCache:ICache<_,_>,serviceUrl:string) =
-        let sources = List.empty
+    type internal ServiceConnection(restCache:ICache<_,_>,serviceUrl:string) =               
+        let sources = List.empty        
         let sdmxUrl (functions: string list) (props: (string * string) list) =
             let url =
                 serviceUrl::(List.map Uri.EscapeUriString functions)
                 |> String.concat "/"
             let query = [ "per_page", "1000"
                           "format", "json" ] @ props
-            printfn "%s" url
+            printfn "[ServiceConnection]=>[sdmxUrl] =  %s" url
             Http.AppendQueryToUrl(url, query)
 
         // The WorldBank data changes very slowly indeed (monthly updates to values, rare updates to schema), hence caching it is ok.
@@ -127,12 +128,13 @@ module Implementation =
 
         let getDimensions() =
             async { return
-                        [ for dimension in [("FREQ", "CL_FREQ_WDI", "1"); 
-                                            ("SERIES", "CL_SERIES_WDI", "2");
-                                            ("REF_AREA", "CL_REF_AREA_WDI", "3");
+                        [ for dimension in [("WB", "FREQ", "CL_FREQ_WDI", "1"); 
+                                            ("WB", "SERIES", "CL_SERIES_WDI", "2");
+                                            ("WB", "REF_AREA", "CL_REF_AREA_WDI", "3");
                                             ] do
-                            let (id, enumerationId, position) = dimension
-                            yield { Id = id
+                            let (agencyId, id, enumerationId, position) = dimension
+                            yield { AgencyId = agencyId
+                                    Id = id
                                     EnumerationId = enumerationId
                                     Position = position } ] }
 
@@ -176,9 +178,8 @@ module Implementation =
                                         Region = region } ] }
         let getDataflows(args) =
             async { return
-                        [ for dataflow in [
-                            ("SDG", "SDG", "UNSD", "0.4"); 
-                            ("WDI", "World Development Indicators", "WB", "1.0")] do
+                        [ for dataflow in [("SDG", "SDG", "UNSD", "0.4"); 
+                                           ("WDI", "World Development Indicators", "WB", "1.0")] do
                             let (id, name, agencyId, version) = dataflow
                             yield { Id = id
                                     Name = name
