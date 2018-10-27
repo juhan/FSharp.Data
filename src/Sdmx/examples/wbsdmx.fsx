@@ -3,11 +3,9 @@
 
 open FSharp.Data
 type SD = SdmxDataProvider<"https://api.worldbank.org/v2/sdmx/rest">
-
 let wb = SD.GetDataContext()
-
-wb.Dataflows.``World Development Indicators``.FREQ.Annual.
-
+let dataflows = wb.Dataflows.SDG.
+dataflows.
 
 // SdmxDataProvider<"World Development Indicators", Asynchronous=true>
 // let wb = SdmxData.GetDataContext()
@@ -17,3 +15,21 @@ wb.Dataflows.``World Development Indicators``.FREQ.Annual.
 
 
 // wb.Countries.Togo.CapitalCity
+
+
+
+let dimensionsType = 
+    let someVal = "111"
+    let fsn = fun aid () -> 
+        printfn "From fsn [%s]" someVal
+        []
+    fsn
+
+
+let dd = dimensionsType
+
+
+<@
+    let f x = x + 10
+    f 20
+@>

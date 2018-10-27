@@ -131,6 +131,7 @@ module Implementation =
                         [ for dimension in [("WB", "FREQ", "CL_FREQ_WDI", "1"); 
                                             ("WB", "SERIES", "CL_SERIES_WDI", "2");
                                             ("WB", "REF_AREA", "CL_REF_AREA_WDI", "3");
+                                            ("UNSD", "FREQ111", "CL_REF_AREA_FREQ", "1");
                                             ] do
                             let (agencyId, id, enumerationId, position) = dimension
                             yield { AgencyId = agencyId
