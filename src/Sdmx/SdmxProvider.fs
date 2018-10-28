@@ -71,14 +71,12 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
 
         let dimensionsType agencyId =
             printfn "dimensionsType arg: [%s]" agencyId
-            let someIntVal = 42
-            let someBoolVal = true
-            let someStrVal = "Str"
-            let someCharVal = 'c'
+            let someIntVal = 42            
+            let someStrVal = "Str"            
             let t = ProvidedTypeDefinition("Dimensions", Some typeof<Dimensions>, hideObjectMethods = true, nonNullable = true)
             let fsn = fun aid () -> 
                 [ for dimension in connection.Dimensions do
-                      printfn "dimension.agencyId [%s] - [%s] - [%s] - [%d] - [%b] - [%c] - [%s]" dimension.Id dimension.AgencyId aid someIntVal someBoolVal someCharVal someStrVal
+                      printfn "dimension.agencyId [%s] - [%s] - [%s] - [%d] - [%s]" dimension.Id dimension.AgencyId aid someIntVal someStrVal
                       if dimension.AgencyId = aid then
                           let prop = 
                               ProvidedProperty

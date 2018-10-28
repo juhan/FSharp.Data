@@ -4,7 +4,11 @@ open FSharp.Data
 
 type WorldBank = WorldBankDataProvider<"World Development Indicators", Asynchronous=true>
 let wb = WorldBank.GetDataContext()
-wb.Topics
+
+
+let euro = wb.Regions.Africa
+euro.Countries.Armenia.Region
+
 let countries = wb.Countries.Togo.Indicators
 wb.Countries.Togo.Code
 wb.Countries.Togo.Name

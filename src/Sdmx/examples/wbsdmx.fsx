@@ -4,8 +4,8 @@
 open FSharp.Data
 type SD = SdmxDataProvider<"https://api.worldbank.org/v2/sdmx/rest">
 let wb = SD.GetDataContext()
-let dataflows = wb.Dataflows.SDG.
-dataflows.
+let dataflows = wb.Dataflows
+dataflows.``World Development Indicators``.
 
 // SdmxDataProvider<"World Development Indicators", Asynchronous=true>
 // let wb = SdmxData.GetDataContext()
