@@ -368,8 +368,7 @@ type DimensionCollection<'T when 'T :> Dimension> internal (connection: ServiceC
     let items =
         seq { let dimensions = connection.Dimensions
               for dimension in dimensions do
-                  let dimensionId = dimension.Id   
-                  yield Dimension(connection, dimensionId) :?> 'T }
+                  yield Dimension(connection, dimension.Id) :?> 'T }
     interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
     interface IDimensionCollection with member x.GetDimension(dimensionId) = Dimension(connection, dimensionId)

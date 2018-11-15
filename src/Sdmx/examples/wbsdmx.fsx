@@ -3,8 +3,12 @@
 
 open FSharp.Data
 type SD = SdmxDataProvider<"https://api.worldbank.org/v2/sdmx/rest">
+let dd = SD.GetDataContext()
+dd.Dataflows.SDG
+let wb = SD.GetDataflowContext().``World Development Indicators``
+let wdi = wb.``World Development Indicators``
 
-let wb = SD.GetDataContext()
+let a = sdg.
 
 wb.Dataflows.``World Development Indicators``.FREQ.Annual.
 
