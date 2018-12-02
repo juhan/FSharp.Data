@@ -82,7 +82,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             t
         
         let dataflowType =
-            let t = ProvidedTypeDefinition("Dataflow", Some typeof<Dimension>, hideObjectMethods = true, nonNullable = true)
+            let t = ProvidedTypeDefinition("Dataflow", Some typeof<Dataflow>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () ->
                 [ let prop = ProvidedProperty("Dimensions", dimensionsType,
                               getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dataflow) :> IDataflow).GetDimensions() @@>))
@@ -92,14 +92,14 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             t
 
         let dataflowsType =
-            let dataflowCollectionType = ProvidedTypeBuilder.MakeGenericType(typedefof<DataflowCollection<_>>, [ dimensionsType ])
-            let t = ProvidedTypeDefinition("Dataflows", Some dataflowCollectionType, hideObjectMethods = true, nonNullable = true)
+            // let dataflowCollectionType = ProvidedTypeBuilder.MakeGenericType(typedefof<DataflowCollection<_>>, [ dimensionsType ])
+            let t = ProvidedTypeDefinition("Dataflows", Some typeof<string>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () ->
                 [ for dataflow in connection.Dataflows do
                     let prop =
                         ProvidedProperty
-                          ( dataflow.Name, dimensionsType,
-                            getterCode = (fun (Singleton arg) -> <@@ ((%%arg : DataflowCollection<Dataflow>) :> IDataflowCollection).GetDataflow(dataflow.Id, dataflow.Name) @@>))
+                          ( dataflow.Name, typeof<string>,
+                            getterCode = (fun (Singleton arg) -> <@@ "Hello World":string @@>))                            
                     prop.AddXmlDoc (sprintf "The data for dataflow '%s'" dataflow.Name)                    
                     yield prop])
             serviceTypesType.AddMember t
@@ -108,14 +108,14 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
         let sdmxDataServiceType =
             let t = ProvidedTypeDefinition("SdmxDataService", Some typeof<SdmxData>, hideObjectMethods = true, nonNullable = true)
             t.AddMembersDelayed (fun () ->
-                [ yield ProvidedProperty("Dataflows", dataflowsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDataflows() @@>)) ])
+                [ yield ProvidedProperty("Dataflows", dataflowsType,  getterCode = (fun (Singleton arg) -> <@@ "((%%arg : SdmxData) :> ISdmxData).GetDataflows()":string @@>)) ])
             serviceTypesType.AddMember t
             t
 
         resTy.AddMembersDelayed (fun () ->
             [ 
                 yield ProvidedMethod ("GetDataContext", [], sdmxDataServiceType, isStatic=true,invokeCode = (fun _ -> <@@ SdmxData(weEntryPoint) @@>));
-                yield ProvidedMethod ("GetDataflowContext", [], dataflowsType, isStatic=true,invokeCode = (fun _ -> <@@ weEntryPoint @@>))
+                yield ProvidedMethod ("GetDataflowContext", [], sdmxDataServiceType, isStatic=true,invokeCode = (fun _ -> <@@ SdmxData(weEntryPoint) @@>))
             ]
         )
         resTy
