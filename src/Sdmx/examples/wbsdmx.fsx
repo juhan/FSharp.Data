@@ -1,8 +1,13 @@
 #r @"../../../bin/lib/net45/FSharp.Data.dll"
-// #r "System.Xml.Linq.dll"
-
+#r "System.Xml.Linq.dll"
 open FSharp.Data
 type SD = SdmxDataProvider<"https://api.worldbank.org/v2/sdmx/rest">
+
+SD.SDG.SDGFREQ
+
+sdg.
+
+
 let c = SD.GetDataContext()
 let dataflows = c.Dataflows
 

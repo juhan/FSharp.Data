@@ -38,86 +38,29 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             resTy.AddMember t
             t
         
-        let rec dimensionValueType =
-            let t = ProvidedTypeDefinition("DimensionValue", Some typeof<DimensionValue>, hideObjectMethods = true, nonNullable = true)
-            t.AddMembersDelayed (fun () -> 
-                [ for dimension in connection.Dimensions do
-                      let enumerationId = dimension.EnumerationId
-                      let prop = 
-                          ProvidedProperty
-                            ( dimension.Id, dimensionType, 
-                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(enumerationId) @@>))
-                      if not (String.IsNullOrEmpty dimension.Position) then prop.AddXmlDoc(dimension.Position)
-                      yield prop                     
-                      ])
-            serviceTypesType.AddMember t
-            t 
-        
-        and dimensionType = 
-            let t = ProvidedTypeDefinition("Dimension", Some typeof<Dimension>, hideObjectMethods = true, nonNullable = true)
-            t.AddMembersDelayed (fun () -> 
-                [ for dimensionValue in connection.DimensionValues do
-                    let prop = 
-                          ProvidedProperty
-                            ( dimensionValue.Name, dimensionValueType, 
-                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dimensions) :> IDimensions).GetDimension(dimensionValue.Id) @@>))
-                    if not (String.IsNullOrEmpty dimensionValue.Name) then prop.AddXmlDoc(dimensionValue.Name)
-                    yield prop ])
-            serviceTypesType.AddMember t
-            t        
+        for dataflow in connection.Dataflows do
+            let dataflowId, dataflowName, agencyId, version = dataflow.Id, dataflow.Name, dataflow.AgencyID, dataflow.Version
+            let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, None, hideObjectMethods = true, nonNullable = true)
+  
+            // Default Constructior  
+            let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
+            dataflowsTypeDefinition.AddMember(ctor)
 
-        let dimensionsType =
-            let dimensionCollectionType = ProvidedTypeBuilder.MakeGenericType(typedefof<DimensionCollection<_>>, [ dimensionType ])
-            let t = ProvidedTypeDefinition("Dimensions", Some dimensionCollectionType, hideObjectMethods = true, nonNullable = true)
-            t.AddMembersDelayed (fun () -> 
-                [ for dimension in connection.Dimensions do
-                      let enumerationId = dimension.EnumerationId
-                      let prop = 
-                          ProvidedProperty
-                            ( dimension.Id, dimensionType, 
-                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : DimensionCollection<Dimension>) :> IDimensionCollection).GetDimension(dimension.Id) @@>))
-                      if not (String.IsNullOrEmpty dimension.Position) then prop.AddXmlDoc(dimension.Position)
-                      yield prop ])
-            serviceTypesType.AddMember t
-            t
-        
-        let dataflowType =
-            let t = ProvidedTypeDefinition("Dataflow", Some typeof<Dataflow>, hideObjectMethods = true, nonNullable = true)
-            t.AddMembersDelayed (fun () ->
-                [ let prop = ProvidedProperty("Dimensions", dimensionsType,
-                              getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Dataflow) :> IDataflow).GetDimensions() @@>))
-                  prop.AddXmlDoc("<summary>The dimensions for the dataflow</summary>")
-                  yield prop ])
-            serviceTypesType.AddMember t
-            t
-
-        let dataflowsType =
-            // let dataflowCollectionType = ProvidedTypeBuilder.MakeGenericType(typedefof<DataflowCollection<_>>, [ dimensionsType ])
-            let t = ProvidedTypeDefinition("Dataflows", Some typeof<string>, hideObjectMethods = true, nonNullable = true)
-            t.AddMembersDelayed (fun () ->
-                [ for dataflow in connection.Dataflows do
-                    let prop =
-                        ProvidedProperty
-                          ( dataflow.Name, typeof<string>,
-                            getterCode = (fun (Singleton arg) -> <@@ "Hello World":string @@>))                            
-                    prop.AddXmlDoc (sprintf "The data for dataflow '%s'" dataflow.Name)                    
-                    yield prop])
-            serviceTypesType.AddMember t
-            t
-
-        let sdmxDataServiceType =
-            let t = ProvidedTypeDefinition("SdmxDataService", Some typeof<SdmxData>, hideObjectMethods = true, nonNullable = true)
-            t.AddMembersDelayed (fun () ->
-                [ yield ProvidedProperty("Dataflows", dataflowsType,  getterCode = (fun (Singleton arg) -> <@@ "((%%arg : SdmxData) :> ISdmxData).GetDataflows()":string @@>)) ])
-            serviceTypesType.AddMember t
-            t
-
-        resTy.AddMembersDelayed (fun () ->
-            [ 
-                yield ProvidedMethod ("GetDataContext", [], sdmxDataServiceType, isStatic=true,invokeCode = (fun _ -> <@@ SdmxData(weEntryPoint) @@>));
-                yield ProvidedMethod ("GetDataflowContext", [], sdmxDataServiceType, isStatic=true,invokeCode = (fun _ -> <@@ SdmxData(weEntryPoint) @@>))
-            ]
-        )
+            // Default property
+            let innerState = ProvidedProperty("InnerState", typeof<string>, isStatic=true, getterCode = fun args -> <@@ "Hello":string @@>)
+            dataflowsTypeDefinition.AddMember(innerState)
+            
+            for dimeRefId, dimensionName, dimensionValues in [("SDG", "FREQ", [("A", "Annual"); ("M", "Monthly")]); ("SDG", "SERIES", [("AG_AGR_TRAC_NO", "Aadgr")]); ("SDG", "FREQ_AREA", [("GEO", "GEO")]);
+                                                             ("WDI", "FREQ", [("A", "Annual"); ("M", "Monthly")]); ("WDI", "SERIES", [("AG_AGR_TRAC_NO", "Aadgr")]); ("WDI", "FREQ_AREA", [("GEO", "GEO")])] do
+                if dataflowId = dimeRefId then
+                    let dimensionTypeDefinition = ProvidedTypeDefinition(string  dataflowId + dimensionName, Some typeof<obj>)
+                    dataflowsTypeDefinition.AddMember(dimensionTypeDefinition)
+                    for codeId, codeName in dimensionValues do
+                        let dimensionValueProperty = ProvidedProperty(codeName, typeof<string>, isStatic=true, getterCode = fun _ -> <@@ codeId:string @@>)
+                        dimensionTypeDefinition.AddMember(dimensionValueProperty)
+                    
+            resTy.AddMember dataflowsTypeDefinition     
+              
         resTy
 
     let paramSdmxType =

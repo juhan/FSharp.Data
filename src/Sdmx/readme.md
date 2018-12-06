@@ -1,7 +1,6 @@
 # SdmxProvider
 
-
-```
+```fsharp
 #r @"../../../bin/lib/net45/FSharp.Data.dll"
 
 open FSharp.Data
@@ -11,18 +10,17 @@ let wb = SD.GetDataContext()
 
 wb.Dataflows.SDG.Dimensions.FREQ
 
-```    
+```
 
-
-# Setup
+## Setup
 
     git clone https://github.com/demonno/FSharp.Data
     git checkout sdxm-experiments
 
-# Build
+## Build
 
     sh build.sh Build
 
-# Test
+## Test
 
 Restart existig F# Interactive shell after each build to see new results.
