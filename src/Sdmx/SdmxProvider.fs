@@ -30,16 +30,11 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
     let createTypesForWsEntryPoint(weEntryPoint, sdmxTypeName, asynchronous) =
         ProviderHelpers.getOrCreateProvidedType cfg this sdmxTypeName <| fun () ->
         let connection = ServiceConnection(restCache, weEntryPoint)
-        let resTy = ProvidedTypeDefinition(asm, ns, sdmxTypeName, None, hideObjectMethods = true, nonNullable = true)
-        
-        let serviceTypesType =
-            let t = ProvidedTypeDefinition("ServiceTypes", None, hideObjectMethods = true, nonNullable = true)
-            t.AddXmlDoc("<summary>Contains the types that describe the data service</summary>")
-            resTy.AddMember t
-            t
+        let resTy = ProvidedTypeDefinition(asm, ns, sdmxTypeName, None, hideObjectMethods = true, nonNullable = true)              
         
         for dataflow in connection.Dataflows do
             let dataflowId, dataflowName, agencyId, version = dataflow.Id, dataflow.Name, dataflow.AgencyID, dataflow.Version
+            printfn "dataflowId: %s dataflowName: %s agencyId: %s version: %s" dataflowId, dataflowName, agencyId, version
             let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, None, hideObjectMethods = true, nonNullable = true)
   
             // Default Constructior  
@@ -50,13 +45,24 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             let innerState = ProvidedProperty("InnerState", typeof<string>, isStatic=true, getterCode = fun args -> <@@ "Hello":string @@>)
             dataflowsTypeDefinition.AddMember(innerState)
             
-            for dimeRefId, dimensionName, dimensionValues in [("SDG", "FREQ", [("A", "Annual"); ("M", "Monthly")]); ("SDG", "SERIES", [("AG_AGR_TRAC_NO", "Aadgr")]); ("SDG", "FREQ_AREA", [("GEO", "GEO")]);
-                                                             ("WDI", "FREQ", [("A", "Annual"); ("M", "Monthly")]); ("WDI", "SERIES", [("AG_AGR_TRAC_NO", "Aadgr")]); ("WDI", "FREQ_AREA", [("GEO", "GEO")])] do
-                if dataflowId = dimeRefId then
-                    let dimensionTypeDefinition = ProvidedTypeDefinition(string  dataflowId + dimensionName, Some typeof<obj>)
+            for dimension in connection.GetDimensions(agencyId, dataflowId)
+                // dimeRefId, dimensionName, dimensionValues
+                // [
+                // ("SDG", "FREQ", [("A", "Annual"); ("M", "Monthly")]); 
+                // ("SDG", "SERIES", [("AG_AGR_TRAC_NO", "Aadgr")]); 
+                // ("SDG", "FREQ_AREA", [("GEO", "GEO")]);
+                
+                // ("WDI", "FREQ", [("A", "Annual"); ("M", "Monthly")]); 
+                // ("WDI", "SERIES", [("AG_AGR_TRAC_NO", "Aadgr")]); 
+                // ("WDI", "FREQ_AREA", [("GEO", "GEO")])] 
+                do
+                printfn "%s - %s - %s - %s " dataflowId dimension.Id dimension.AgencyId dimension.DataStructureId
+                if dataflowId = dimension.DataStructureId then
+                    let dimensionTypeDefinition = ProvidedTypeDefinition(string  dataflowId + dimension.Id, Some typeof<obj>)
                     dataflowsTypeDefinition.AddMember(dimensionTypeDefinition)
-                    for codeId, codeName in dimensionValues do
-                        let dimensionValueProperty = ProvidedProperty(codeName, typeof<string>, isStatic=true, getterCode = fun _ -> <@@ codeId:string @@>)
+                    for dimensionValue in dimension.DimensionValues do
+                        // codeId, codeName 
+                        let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<string>, isStatic=true, getterCode = fun _ -> <@@ dimensionValue.Id:string @@>)
                         dimensionTypeDefinition.AddMember(dimensionValueProperty)
                     
             resTy.AddMember dataflowsTypeDefinition     

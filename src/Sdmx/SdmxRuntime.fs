@@ -8,6 +8,7 @@ open System
 open System.Collections
 open System.Diagnostics
 open System.Globalization
+open System.Xml.Linq
 open System.Net
 open FSharp.Data
 open FSharp.Data.JsonExtensions
@@ -27,15 +28,18 @@ module Implementation =
           Source : string
           Description : string }
 
-    type internal DimensionRecord =
-        { AgencyId : string
-          Id : string
-          EnumerationId: string
-          Position: string}
-
     type internal DimensionValueRecord =
         { Id : string
           Name: string}
+      
+    type internal DimensionRecord =
+        { 
+          DataStructureId : string
+          AgencyId : string
+          Id : string
+          EnumerationId: string
+          Position: string
+          DimensionValues : DimensionValueRecord list}
 
     type internal CountryRecord =
         { Id : string
@@ -61,13 +65,79 @@ module Implementation =
             let url =
                 serviceUrl::(List.map Uri.EscapeUriString functions)
                 |> String.concat "/"
-            let query = [ "per_page", "1000"
-                          "format", "json" ] @ props
-            printfn "[ServiceConnection]=>[sdmxUrl] =  %s" url
-            Http.AppendQueryToUrl(url, query)
+            let query = props            
+            let url = Http.AppendQueryToUrl(url, query)
+            printfn "url: %s" url
+            url
 
+        // let sdmxDataflowsUrl = 
+        //     let agencyId = "all"
+        //     let resourceId = "all"
+        //     let version = "latest"
+        //     let allDataflows = serviceUrl + "/dataflow/all/all/latest/"
+        //     let url = sprintf "%s/dataflow/%s/%s/%s/" serviceUrl agencyId resourceId version
+        //     printfn "Dataflows url: %s" url
+        //     url
+        let sdmxDatastructuresUrl agencyId dataflowId = 
+            // let agencyId = "WB"
+            let resourceId = dataflowId
+            let version = "1.0"
+            let query = [ "references", "children"]
+            // Structural metadata queries: 
+            // https://ws-entry-point/resource/agencyID/resourceID/version/itemID?queryStringParameters
+            let url = sprintf "%s/datastructure/%s/%s/%s/" serviceUrl agencyId resourceId version
+            let q = Http.AppendQueryToUrl(url, query)
+            printfn "Datastructure url: %s" q
+            q
+
+        // let sdmxRequest resourceName args= 
+        //     // match resourceName with
+        //     // | "dataflows" -> "Load all dataflows"
+        //     // | "datastructures" -> "Load all datastructures"
+        //     // | _ -> "fail"
+
+        //     let doc = Http.AsyncRequestString(sdmxDataflowsUrl, headers = [ HttpRequestHeaders.UserAgent "F# Data WorldBank Type Provider"
+        //                                                                     HttpRequestHeaders.Accept HttpContentTypes.Json ])
+        //     doc
+        
         // The WorldBank data changes very slowly indeed (monthly updates to values, rare updates to schema), hence caching it is ok.
 
+        let sdmxRequest resouces queryParams : string =
+            let url = sdmxUrl resouces queryParams
+            // match restCache.TryRetrieve(url) with
+            match None with
+            | Some res -> 
+                printfn "Return Cached value for url: %s" url
+                res
+            | None ->
+                try
+                    // printfn "Query New doc"
+                    // let! doc = Http.AsyncRequestString(url)
+                    let response = Http.Request(url)                                                
+                    let bodyText = 
+                        match response.StatusCode with
+                        | 200 ->
+                            match response.Body with
+                            | Text text -> text
+                            // if not (String.IsNullOrEmpty response.Body) then
+                            //     restCache.Set(url, response.Body)
+                            // printfn "Length: %i" (String.length response.Body)
+                            // return response.StatusCode
+                            | Binary bytes -> 
+                                string bytes.Length
+                        | 307 -> 
+                            printfn "Response 307"
+                            "-"
+                        | 404 -> 
+                            printfn "Response 307"
+                            "-"
+                        | status   -> 
+                            printfn "Response %i" status
+                            "-"
+                    bodyText
+                with e ->  
+                    printfn "Failed request %s" e.Message                       
+                    "-" 
         let rec worldBankRequest attempt funcs args : Async<string> =
             async {
                 let url = sdmxUrl funcs args
@@ -87,6 +157,9 @@ module Implementation =
                         if attempt > 0 then
                             return! worldBankRequest (attempt - 1) funcs args
                         else return! failwithf "Failed to request '%s'. Error: %O" url e }
+
+        let rec getSdmxDocuments resourceIdentificators queryParams: string =
+            sdmxRequest resourceIdentificators queryParams
 
         let rec getDocuments funcs args page parallelPages =
             async { let! docs =
@@ -126,17 +199,72 @@ module Implementation =
                                             Source = sourceName
                                             Description = sourceNote} ] }
 
-        let getDimensions() =
-            async { return
-                        [ for dimension in [("WB", "FREQ", "CL_FREQ_WDI", "1"); 
-                                            ("WB", "SERIES", "CL_SERIES_WDI", "2");
-                                            ("WB", "REF_AREA", "CL_REF_AREA_WDI", "3");
-                                            ] do
-                            let (agencyId, id, enumerationId, position) = dimension
-                            yield { AgencyId = agencyId
-                                    Id = id
-                                    EnumerationId = enumerationId
-                                    Position = position } ] }
+        let getDimensions agencyId dataflowId =
+            // printfn "getDimensions agencyId: %s - dataflowId: %s " agencyId dataflowId
+            // helper functions
+            let xn (s:string) = XName.Get(s)
+            let xmes (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message")
+            let xstr (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure")
+            let xcom (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common")
+        
+            async { 
+                // printfn "Download Datastructure: %s" (sdmxDatastructuresUrl agencyId dataflowId)
+                // let xml = Http.RequestString("https://api.worldbank.org/v2/sdmx/rest/datastructure/WB/WDI/1.0/?references=children")
+                // let xml = Http.RequestString(sdmxDatastructuresUrl agencyId dataflowId)
+                let dimensionsXml = getSdmxDocuments ["datastructure"; agencyId; dataflowId; "1.0"] [ "references", "children"]                              
+                return match dimensionsXml with
+                | "-" -> []
+                | _ ->
+                    let xd = XDocument.Parse(dimensionsXml)
+                    let rootElement = xd.Root
+                    let headerElement = rootElement.Element(xmes "Header")
+                    let structuresElements = rootElement.Element(xmes "Structures")
+                    let codelistsElement = structuresElements.Element(xstr "Codelists")
+                    let codelistElements = codelistsElement.Elements(xstr "Codelist")
+                    let conceptsElement = structuresElements.Element(xstr "Concepts")
+                    let dataStructuresElement = structuresElements.Element(xstr "DataStructures")
+                    let dataStructureElement = dataStructuresElement.Element(xstr "DataStructure")
+                    let datastructureId = dataStructureElement.Attribute(xn "id").Value
+                    let dimensionListElement = dataStructureElement.Element(xstr "DataStructureComponents").Element(xstr "DimensionList")
+                    let dimensionElements = dimensionListElement.Elements(xstr "Dimension")
+                    // TODO use 
+                    let timeDimension = dimensionListElement.Element(xstr "TimeDimension")
+
+                    let dimensions = 
+                        seq {
+                            for dimensionElement in dimensionElements do
+                                let dimensionId = dimensionElement.Attribute(xn "id")
+                                let enumerationRefId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "id")
+                                let enumerationRefAgencyId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "agencyID")
+                                let positionAttribute = dimensionElement.Attribute(xn "position")            
+                                yield dimensionId.Value, enumerationRefAgencyId.Value, enumerationRefId.Value, positionAttribute.Value
+                        }
+                    let d = [ 
+                        for dimensionId, enumerationRefAgencyId, enumerationRefId, position in dimensions do
+                            let dimensionOption = codelistElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = enumerationRefId)
+                            match dimensionOption with
+                            | Some dimensionValue -> 
+                                let dimensionCodes = dimensionValue.Elements(xstr "Code")
+                                let dimensionRecords = seq {
+                                    for dimensionCode in dimensionCodes do
+                                        let dimensionValue = dimensionCode.Element(xcom "Name").Value
+                                        let dimensionValueId = dimensionCode.Attribute(xn "id").Value
+                                        yield {
+                                            Id=dimensionValueId
+                                            Name=dimensionValue
+                                        }
+                                }
+                                yield {
+                                    DataStructureId=datastructureId 
+                                    AgencyId=enumerationRefAgencyId
+                                    Id=dimensionId
+                                    EnumerationId=enumerationRefId
+                                    Position=position
+                                    DimensionValues=Seq.toList dimensionRecords
+                                }
+                    ]
+                    d
+            }
 
         let getDimensionValues() =
             async { return
@@ -162,7 +290,7 @@ module Implementation =
                                 yield { Id = id
                                         Name = name
                                         Description = sourceNote } ] }
-
+                                        
         let getCountries(args) =
             async { let! docs = getDocuments ["country"] args 1 1
                     return
@@ -177,14 +305,37 @@ module Implementation =
                                         CapitalCity = capitalCity
                                         Region = region } ] }
         let getDataflows(args) =
-            async { return
-                        [ for dataflow in [("SDG", "SDG", "UNSD", "0.4"); 
-                                           ("WDI", "World Development Indicators", "WB", "1.0")] do
-                            let (id, name, agencyId, version) = dataflow
-                            yield { Id = id
-                                    Name = name
-                                    AgencyID = agencyId
-                                    Version = version} ] }
+            // https://api.worldbank.org/v2/sdmx/rest/dataflow/all/all/latest/
+            // helper functions
+            printfn "Getting Dataflows"
+            let xn (s:string) = XName.Get(s)
+            let xmes (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message")
+            let xstr (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure")
+            let xcom (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common")
+
+            async {
+                let dataflowsXml = getSdmxDocuments ["dataflow"; "all"; "all"; "latest"] []
+                // printfn "dataflowsXml Dataflows"
+                let xd = XDocument.Parse(dataflowsXml)
+                let rootElement = xd.Root
+                let headerElement = rootElement.Element(xmes "Header")
+                let structuresElements = rootElement.Element(xmes "Structures")
+                let dataflowsEelements = structuresElements.Element(xstr "Dataflows").Elements(xstr "Dataflow")
+                return 
+                    [ for dataflowsEelement in dataflowsEelements do
+                        let structureElement = dataflowsEelement.Element(xstr "Structure")
+                        let refElement = structureElement.Element(xn "Ref")
+                        let dataflowDisplayName:string = dataflowsEelement.Element(xcom "Name").Value.Trim()
+                        let dataflowId:string = refElement.Attribute(xn "id").Value
+                        let dataflowAgencyId:string = refElement.Attribute(xn "agencyID").Value
+                        let dataflowVersion:string = refElement.Attribute(xn "version").Value                        
+                        yield {
+                            Id = dataflowId
+                            Name = dataflowDisplayName
+                            AgencyID = dataflowAgencyId
+                            Version = dataflowVersion
+                        }
+                    ]}            
         let getRegions() =
             async { let! docs = getDocuments ["region"] [] 1 1
                     return
@@ -205,7 +356,7 @@ module Implementation =
         let topics = lazy (getTopics() |> Async.RunSynchronously)
         let topicsIndexed = lazy (topics.Force() |> Seq.map (fun t -> t.Id, t) |> dict)
         let indicators = lazy (getIndicators() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Name) |> Seq.toList)
-        let dimensions = lazy (getDimensions() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Id) |> Seq.toList)
+        let dimensions = lazy (getDimensions "" "" |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Id) |> Seq.toList)
         let dimensionValues = lazy (getDimensionValues() |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Id) |> Seq.toList)
         let indicatorsIndexed = lazy (indicators.Force() |> Seq.map (fun i -> i.Id, i) |> dict)
         let dimensionsIndexed = lazy (dimensions.Force() |> Seq.map (fun i -> i.Id, i) |> dict)
@@ -227,6 +378,8 @@ module Implementation =
         member internal __.Indicators = indicators.Force()
         member internal __.IndicatorsIndexed = indicatorsIndexed.Force()
         member internal __.Dimensions = dimensions.Force()
+        member internal __.DimensionsByDataflow = dimensions.Force()
+
         member internal __.DimensionsIndexed = dimensionsIndexed.Force()
         member internal __.DimensionValues = dimensionValues.Force()
         
@@ -238,6 +391,11 @@ module Implementation =
         member internal __.Regions = regions.Force()
         member internal __.RegionsIndexed = regionsIndexed.Force()
         /// At runtime, download the data
+        member internal __.GetDimensionsAsync(agencyId, dataflowId) = 
+            async { let! data = getDimensions agencyId dataflowId                        
+                    return data }
+        member internal x.GetDimensions(agencyId, dataflowId) =
+             x.GetDimensionsAsync(agencyId, dataflowId) |> Async.RunSynchronously
         member internal __.GetDataAsync(countryOrRegionCode, indicatorCode) =
             async { let! data =
                       getData
