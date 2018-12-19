@@ -1,4 +1,4 @@
-﻿// --------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Sdmx type provider - runtime components
 // --------------------------------------------------------------------------------------
 
@@ -17,6 +17,7 @@ open FSharp.Data.Runtime.Caching
 [<AutoOpen>]
 /// [omit]
 module Implementation =
+
 
     let private retryCount = 5
     let private parallelIndicatorPageDownloads = 8
@@ -103,43 +104,46 @@ module Implementation =
         
         // The WorldBank data changes very slowly indeed (monthly updates to values, rare updates to schema), hence caching it is ok.
 
-        let sdmxRequest resouces queryParams : string =
-            let url = sdmxUrl resouces queryParams
-            // match restCache.TryRetrieve(url) with
-            match None with
-            | Some res -> 
-                printfn "Return Cached value for url: %s" url
-                res
-            | None ->
-                try
-                    // printfn "Query New doc"
-                    // let! doc = Http.AsyncRequestString(url)
-                    printfn "url: %s" url
-                    let response = Http.Request(url)// raises error on 404                                             
-                    let bodyText = 
-                        match response.StatusCode with
-                        | 200 ->
-                            match response.Body with
-                            | Text text -> text
-                            // if not (String.IsNullOrEmpty response.Body) then
-                            //     restCache.Set(url, response.Body)
-                            // printfn "Length: %i" (String.length response.Body)
-                            // return response.StatusCode
-                            | Binary bytes -> 
-                                string bytes.Length
-                        | 307 -> 
-                            printfn "Response 307"
-                            "-"
-                        | 404 -> 
-                            printfn "Response 404"
-                            "-"
-                        | status   -> 
-                            printfn "Response %i" status
-                            "-"
-                    bodyText
-                with e ->  
-                    printfn "Failed request %s" e.Message                       
-                    "-" 
+        let sdmxRequest resouces queryParams : Async<string> =
+            async {
+                let url = sdmxUrl resouces queryParams
+                // match restCache.TryRetrieve(url) with
+                match None with
+                | Some res -> 
+                    printfn "Return Cached value for url: %s" url
+                    return res
+                | None ->
+                    try
+                        // printfn "Query New doc"
+                        // let! doc = Http.AsyncRequestString(url)
+                        printfn "url: %s" url
+                        let response = Http.Request(url)// raises error on 404                                             
+                        let bodyText = 
+                            match response.StatusCode with
+                            | 200 ->
+                                match response.Body with
+                                | Text text -> text
+                                // if not (String.IsNullOrEmpty response.Body) then
+                                //     restCache.Set(url, response.Body)
+                                // printfn "Length: %i" (String.length response.Body)
+                                // return response.StatusCode
+                                | Binary bytes -> 
+                                    string bytes.Length
+                            | 307 -> 
+                                printfn "Response 307"
+                                "-"
+                            | 404 -> 
+                                printfn "Response 404"
+                                "-"
+                            | status   -> 
+                                printfn "Response %i" status
+                                "-"
+                        return bodyText
+                    with e ->  
+                        printfn "Failed request %s" e.Message                       
+                        return "-"
+            }
+             
         let rec worldBankRequest attempt funcs args : Async<string> =
             async {
                 let url = sdmxUrl funcs args
@@ -160,8 +164,12 @@ module Implementation =
                             return! worldBankRequest (attempt - 1) funcs args
                         else return! failwithf "Failed to request '%s'. Error: %O" url e }
 
-        let rec getSdmxDocuments resourceIdentificators queryParams: string =
-            sdmxRequest resourceIdentificators queryParams
+        let rec getSdmxDocuments resourceIdentificators queryParams: Async<string> =
+            async {
+                let! data = sdmxRequest resourceIdentificators queryParams
+                return data
+            }
+            
 
         let rec getDocuments funcs args page parallelPages =
             async { let! docs =
@@ -213,7 +221,7 @@ module Implementation =
                 // printfn "Download Datastructure: %s" (sdmxDatastructuresUrl agencyId dataflowId)
                 // let xml = Http.RequestString("https://api.worldbank.org/v2/sdmx/rest/datastructure/WB/WDI/1.0/?references=children")
                 // let xml = Http.RequestString(sdmxDatastructuresUrl agencyId dataflowId)
-                let dimensionsXml = getSdmxDocuments ["datastructure"; agencyId; dataflowId; "1.0"] [ "references", "children"]                              
+                let! dimensionsXml = getSdmxDocuments ["datastructure"; agencyId; dataflowId; "1.0"] [ "references", "children"]                              
                 return match dimensionsXml with
                 | "-" -> []
                 | _ ->
@@ -318,7 +326,7 @@ module Implementation =
             let xcom (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common")
 
             async {
-                let dataflowsXml = getSdmxDocuments ["dataflow"; "all"; "all"; "latest"] []
+                let! dataflowsXml = getSdmxDocuments ["dataflow"; "all"; "all"; "latest"] []
                 // printfn "dataflowsXml Dataflows"
                 let xd = XDocument.Parse(dataflowsXml)
                 let rootElement = xd.Root
