@@ -8,8 +8,9 @@ let a = dataflows.A.
 let b = dataflows.B
 let c = dataflows.C
 
+let s = ["Abla"; "bbb"]
 
-
+(+) (s |> String.concat "/") "/"
 
 
 

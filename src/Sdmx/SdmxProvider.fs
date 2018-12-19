@@ -41,28 +41,33 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
             dataflowsTypeDefinition.AddMember(ctor)
 
-            // Default property
+            // // Default property
             let innerState = ProvidedProperty("InnerState", typeof<string>, isStatic=true, getterCode = fun args -> <@@ "Hello":string @@>)
             dataflowsTypeDefinition.AddMember(innerState)
             
-            for dimension in connection.GetDimensions(agencyId, dataflowId)
-                // dimeRefId, dimensionName, dimensionValues
-                // [
-                // ("SDG", "FREQ", [("A", "Annual"); ("M", "Monthly")]); 
-                // ("SDG", "SERIES", [("AG_AGR_TRAC_NO", "Aadgr")]); 
-                // ("SDG", "FREQ_AREA", [("GEO", "GEO")]);
-                
-                // ("WDI", "FREQ", [("A", "Annual"); ("M", "Monthly")]); 
-                // ("WDI", "SERIES", [("AG_AGR_TRAC_NO", "Aadgr")]); 
-                // ("WDI", "FREQ_AREA", [("GEO", "GEO")])] 
-                do
+            // dataflowsTypeDefinition.AddMembersDelayed(
+            //     fun () -> [
+            //         for dimension in connection.GetDimensions(agencyId, dataflowId) do
+            //             if dataflowId = dimension.DataStructureId then
+            //                 let dimensionTypeDefinition = ProvidedTypeDefinition(dimension.DimensionName, Some typeof<obj>, hideObjectMethods = true, nonNullable = true)                            
+            //                 dataflowsTypeDefinition.AddMember(dimensionTypeDefinition)
+            //                 for dimensionValue in dimension.DimensionValues do
+            //                     // codeId, codeName 
+            //                     let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<string>, isStatic=true, getterCode = fun _ -> <@@ dimensionValue.Id:string @@>)
+            //                     dimensionTypeDefinition.AddMember(dimensionValueProperty)
+            //     ]
+            // )
+            
+            for dimension in connection.GetDimensions(agencyId, dataflowId) do
                 printfn "%s - %s - %s - %s " dataflowId dimension.Id dimension.AgencyId dimension.DataStructureId
                 if dataflowId = dimension.DataStructureId then
-                    let dimensionTypeDefinition = ProvidedTypeDefinition(string  dataflowId + dimension.Id, Some typeof<obj>)
+                    let dimensionTypeDefinition = ProvidedTypeDefinition(dimension.DimensionName, Some typeof<obj>)
+                    let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
+                    dimensionTypeDefinition.AddMember(ctor)
                     dataflowsTypeDefinition.AddMember(dimensionTypeDefinition)
                     for dimensionValue in dimension.DimensionValues do
                         // codeId, codeName 
-                        let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<string>, isStatic=true, getterCode = fun _ -> <@@ dimensionValue.Id:string @@>)
+                        let dimensionValueProperty = ProvidedProperty(dimensionValue.Id, typeof<string>, isStatic=true, getterCode = fun _ -> <@@ dimensionValue.Id:string @@>)
                         dimensionTypeDefinition.AddMember(dimensionValueProperty)
                     
             resTy.AddMember dataflowsTypeDefinition     

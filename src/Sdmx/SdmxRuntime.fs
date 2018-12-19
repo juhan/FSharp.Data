@@ -34,6 +34,7 @@ module Implementation =
       
     type internal DimensionRecord =
         { 
+          DimensionName : string
           DataStructureId : string
           AgencyId : string
           Id : string
@@ -65,10 +66,10 @@ module Implementation =
             let url =
                 serviceUrl::(List.map Uri.EscapeUriString functions)
                 |> String.concat "/"
+            let url = url + "/"
             let query = props            
-            let url = Http.AppendQueryToUrl(url, query)
-            printfn "url: %s" url
-            url
+            let requestUrl = Http.AppendQueryToUrl(url, query)            
+            requestUrl
 
         // let sdmxDataflowsUrl = 
         //     let agencyId = "all"
@@ -113,7 +114,8 @@ module Implementation =
                 try
                     // printfn "Query New doc"
                     // let! doc = Http.AsyncRequestString(url)
-                    let response = Http.Request(url)                                                
+                    printfn "url: %s" url
+                    let response = Http.Request(url)// raises error on 404                                             
                     let bodyText = 
                         match response.StatusCode with
                         | 200 ->
@@ -129,7 +131,7 @@ module Implementation =
                             printfn "Response 307"
                             "-"
                         | 404 -> 
-                            printfn "Response 307"
+                            printfn "Response 404"
                             "-"
                         | status   -> 
                             printfn "Response %i" status
@@ -245,6 +247,7 @@ module Implementation =
                             match dimensionOption with
                             | Some dimensionValue -> 
                                 let dimensionCodes = dimensionValue.Elements(xstr "Code")
+                                let dimensionName = dimensionValue.Element(xcom "Name").Value
                                 let dimensionRecords = seq {
                                     for dimensionCode in dimensionCodes do
                                         let dimensionValue = dimensionCode.Element(xcom "Name").Value
@@ -255,6 +258,7 @@ module Implementation =
                                         }
                                 }
                                 yield {
+                                    DimensionName=dimensionName
                                     DataStructureId=datastructureId 
                                     AgencyId=enumerationRefAgencyId
                                     Id=dimensionId

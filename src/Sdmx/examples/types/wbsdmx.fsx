@@ -6,14 +6,26 @@ open System.Xml
 open System.Xml.Linq
 open System
 
-type ECB = SdmxDataProvider<"https://sdw-wsrest.ecb.europa.eu/service"> //"/dataflow/all/all/latest/"
-ECB.``Banknotes statistics``.ECB_BKN1BKN_DENOM.``20 cents``
+// type ECB = SdmxDataProvider<"https://sdw-wsrest.ecb.europa.eu/service"> //"/dataflow/all/all/latest/"
+// type BANKNOTES = ECB.``Banknotes statistics``
 
 type WB = SdmxDataProvider<"https://api.worldbank.org/v2/sdmx/rest">
-WB.
-let freq = SD.SDG.SDGFREQ.Annual
-let ref = SD.SDG.SDGFREQ_AREA.GEO
-let ser = SD.SDG.SDGSERIES.Aadgr
+type WDI = WB.``World Development Indicators``
+
+WDI.``Frequency code list``
+
+
+// WB.``World Development Indicators``.WDIFREQ.Annual
+
+// type WDI = WB.``World Development Indicators``
+// WDI.
+// let area = WDI.``Reference area code list``.Georgia
+// let series = WDI.``Series code list``.``Demand for family planning satisfied by modern methods (% of married women with demand for family planning)``
+
+
+// let freq = SD.SDG.SDGFREQ.Annual
+// let ref = SD.SDG.SDGFREQ_AREA.GEO
+// let ser = SD.SDG.SDGSERIES.Aadgr
 
 // requirements section
 // include scenarios, 
@@ -27,12 +39,12 @@ let ser = SD.SDG.SDGSERIES.Aadgr
 // What is 
 
 
-SD.SDG.SDGFREQ // error
+// SD.SDG.SDGFREQ // error
 
-let c = SD.GetDataContext()
-let dataflows = c.Dataflows
+// let c = SD.GetDataContext()
+// let dataflows = c.Dataflows
 
-dataflows.``World Development Indicators``
+// dataflows.``World Development Indicators``
 
 let dfC = SD.GetDataflowContext()
 
