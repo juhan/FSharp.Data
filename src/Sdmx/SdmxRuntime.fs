@@ -18,7 +18,6 @@ open FSharp.Data.Runtime.Caching
 /// [omit]
 module Implementation =
 
-
     let private retryCount = 5
     let private parallelIndicatorPageDownloads = 8
 

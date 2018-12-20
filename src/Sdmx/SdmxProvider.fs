@@ -38,28 +38,76 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, None, hideObjectMethods = true, nonNullable = true)
   
             // Default Constructior  
-            let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
+            let ctor = ProvidedConstructor([ for dimension in connection.GetDimensions(agencyId, dataflowId) do
+                                                yield ProvidedParameter(dimension.Id, typeof<string>)
+            ], invokeCode = fun (Singleton arg) -> <@@   
+                printfn "Constr:  %s" %%arg
+                "My internal state" :> obj
+            @@>)
             dataflowsTypeDefinition.AddMember(ctor)
 
             // // Default property
             let innerState = ProvidedProperty("InnerState", typeof<string>, isStatic=true, getterCode = fun args -> <@@ "Hello":string @@>)
             dataflowsTypeDefinition.AddMember(innerState)
-            
+
+            let dimensionType =
+                let t = ProvidedTypeDefinition("Country", Some typeof<Dimension>, hideObjectMethods = true, nonNullable = true)
+                //t.AddMembersDelayed (fun () -> 
+                //    [ let prop = ProvidedProperty("Indicators", indicatorsType, 
+                //                  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Country) :> ICountry).GetIndicators() @@>))
+                //      prop.AddXmlDoc("<summary>The indicators for the country</summary>")
+                //      yield prop ] )
+                //serviceTypesType.AddMember t
+                t
+
+            let dimensionsType =
+                let countryCollectionType = ProvidedTypeBuilder.MakeGenericType(typedefof<DimensionCollection<_>>, [ dimensionType ])
+                let t = ProvidedTypeDefinition("Dimensions", Some countryCollectionType, hideObjectMethods = true, nonNullable = true)
+                t.AddMembersDelayed (fun () -> 
+                    [ for dimension in connection.GetDimensions(agencyId, dataflowId) do
+                        let countryIdVal = dimension.Id
+                        let name = dimension.DimensionName
+                        let prop = 
+                            ProvidedProperty
+                              ( name, dimensionType, 
+                                getterCode = (fun (Singleton arg) -> <@@ ((%%arg : DimensionCollection<Dimension>) :> IDimensionCollection).GetDimension(countryIdVal) @@>))
+                        prop.AddXmlDoc (sprintf "The data for country '%s'" dimension.DimensionName)
+                        yield prop ])
+                //serviceTypesType.AddMember t
+                t
+
+            let sdmxDataServiceType =
+                let t = ProvidedTypeDefinition("WorldBankDataService", Some typeof<SdmxData>, hideObjectMethods = true, nonNullable = true)
+                t.AddMembersDelayed (fun () -> 
+                    [
+                    yield ProvidedProperty("Dataflows", dimensionsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDataflows() @@>))
+                     ])
+                //serviceTypesType.AddMember t
+                t
+
             dataflowsTypeDefinition.AddMembersDelayed(
-                 fun () -> [
-                     for dimension in connection.GetDimensions(agencyId, dataflowId) do
+                 fun () ->
+                    [ for dimension in connection.GetDimensions(agencyId, dataflowId) do
                          if dataflowId = dimension.DataStructureId then
-                             let dimensionTypeDefinition = ProvidedTypeDefinition(dimension.DimensionName, Some typeof<obj>, hideObjectMethods = true, nonNullable = true)
-                             let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
-                             dimensionTypeDefinition.AddMember ctor
-                             dataflowsTypeDefinition.AddMember(dimensionTypeDefinition)
-                             for dimensionValue in dimension.DimensionValues do
-                                 // codeId, codeName 
-                                 let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<string>, isStatic=true, getterCode = fun _ -> <@@ dimensionValue.Id:string @@>)
-                                 dimensionTypeDefinition.AddMember(dimensionValueProperty)
-                 ]
-             )
-            
+                            let dimensionTypeDefinition = ProvidedTypeDefinition(dimension.DimensionName, Some typeof<DimensionValueRecord>, hideObjectMethods = true, nonNullable = true)
+                            let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
+                            dimensionTypeDefinition.AddMember ctor
+                            for dimensionValue in dimension.DimensionValues do
+                                let quoteVale = [dimensionValue.Id; dimensionValue.Name] |> String.concat "$"
+                                let dimenValueType = {Id=dimensionValue.Id; Name=dimensionValue.Name}
+                                let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<string>, isStatic=true, getterCode = fun _ -> <@@
+                                    quoteVale
+                                @@>)
+                                //let dimensionValueTypeDefinition = ProvidedTypeDefinition(dimensionValue.Name, Some typeof<obj>, hideObjectMethods = true, nonNullable = true)
+                                //let ctor2 = ProvidedConstructor([], invokeCode = fun _ -> <@@ "Hello " :> obj @@>)                            
+                                //dimensionValueTypeDefinition.AddMember dimensionValueProperty
+                                //dimensionValueTypeDefinition.AddMember ctor2
+                                dimensionTypeDefinition.AddMember dimensionValueProperty
+                            yield dimensionTypeDefinition])
+
+
+
+
             //for dimension in connection.GetDimensions(agencyId, dataflowId) do
             //    printfn "%s - %s - %s - %s " dataflowId dimension.Id dimension.AgencyId dimension.DataStructureId
             //    if dataflowId = dimension.DataStructureId then
