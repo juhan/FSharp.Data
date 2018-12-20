@@ -50,41 +50,6 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             let innerState = ProvidedProperty("InnerState", typeof<string>, isStatic=true, getterCode = fun args -> <@@ "Hello":string @@>)
             dataflowsTypeDefinition.AddMember(innerState)
 
-            let dimensionType =
-                let t = ProvidedTypeDefinition("Country", Some typeof<Dimension>, hideObjectMethods = true, nonNullable = true)
-                //t.AddMembersDelayed (fun () -> 
-                //    [ let prop = ProvidedProperty("Indicators", indicatorsType, 
-                //                  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : Country) :> ICountry).GetIndicators() @@>))
-                //      prop.AddXmlDoc("<summary>The indicators for the country</summary>")
-                //      yield prop ] )
-                //serviceTypesType.AddMember t
-                t
-
-            let dimensionsType =
-                let countryCollectionType = ProvidedTypeBuilder.MakeGenericType(typedefof<DimensionCollection<_>>, [ dimensionType ])
-                let t = ProvidedTypeDefinition("Dimensions", Some countryCollectionType, hideObjectMethods = true, nonNullable = true)
-                t.AddMembersDelayed (fun () -> 
-                    [ for dimension in connection.GetDimensions(agencyId, dataflowId) do
-                        let countryIdVal = dimension.Id
-                        let name = dimension.DimensionName
-                        let prop = 
-                            ProvidedProperty
-                              ( name, dimensionType, 
-                                getterCode = (fun (Singleton arg) -> <@@ ((%%arg : DimensionCollection<Dimension>) :> IDimensionCollection).GetDimension(countryIdVal) @@>))
-                        prop.AddXmlDoc (sprintf "The data for country '%s'" dimension.DimensionName)
-                        yield prop ])
-                //serviceTypesType.AddMember t
-                t
-
-            let sdmxDataServiceType =
-                let t = ProvidedTypeDefinition("WorldBankDataService", Some typeof<SdmxData>, hideObjectMethods = true, nonNullable = true)
-                t.AddMembersDelayed (fun () -> 
-                    [
-                    yield ProvidedProperty("Dataflows", dimensionsType,  getterCode = (fun (Singleton arg) -> <@@ ((%%arg : SdmxData) :> ISdmxData).GetDataflows() @@>))
-                     ])
-                //serviceTypesType.AddMember t
-                t
-
             dataflowsTypeDefinition.AddMembersDelayed(
                  fun () ->
                     [ for dimension in connection.GetDimensions(agencyId, dataflowId) do
