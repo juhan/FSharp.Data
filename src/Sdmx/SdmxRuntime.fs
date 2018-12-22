@@ -542,11 +542,40 @@ type DimensionCollection<'T when 'T :> Dimension> internal (connection: ServiceC
     interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
     interface IDimensionCollection with member x.GetDimension(dimensionId) = Dimension(connection, dimensionId)
 
+    
 
+/// [omit]
+type IDemo = 
+    abstract GetIndicators : unit -> string
+
+[<StructuredFormatDisplay("{Name}")>]
+/// Metadata for a Topic
+type Demo internal (connection:string, topicCode:string) = 
+    let indicatorsDescriptions = "new IndicatorsDescriptions(connection, topicCode)"
+    /// Get the WorldBank code of the topic
+    member x.Code = topicCode
+    /// Get the name of the topic 
+    member x.Name = "connection.TopicsIndexed.[topicCode].Name"
+    /// Get the description of the topic 
+    member x.Description = "connection.TopicsIndexed.[topicCode].Description"
+    interface IDemo with member x.GetIndicators() = indicatorsDescriptions
+
+
+/// [omit]
+type ITopicCollection =
+    abstract GetTopic : topicCode:string -> Demo
+
+/// [omit]
+type TopicCollection<'T when 'T :> Demo> internal (connection: string) = 
+    let items = seq { for topic in ["1"; "2"] -> Demo(connection, topic) :?> 'T } 
+    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
+    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
+    interface ITopicCollection with member x.GetTopic(topicCode) = Demo(connection, topicCode)
 /// [omit]
 type ISdmxData =
     abstract GetDataflows<'T when 'T :> Dataflow> : unit -> seq<'T>
     abstract GetDimensions<'T when 'T :> Dimension> : unit -> seq<'T>
+    abstract GetTopic : topicCode:string -> Demo
 
 /// [omit]
 type SdmxData(serviceUrl:string) =
@@ -555,3 +584,8 @@ type SdmxData(serviceUrl:string) =
     interface ISdmxData with
         member x.GetDataflows() = DataflowCollection(connection) :> seq<_>
         member x.GetDimensions() = DimensionCollection(connection) :> seq<_>
+        member x.GetTopic(tc) =  Demo("asdasd", tc)
+
+
+
+
