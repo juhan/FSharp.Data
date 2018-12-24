@@ -10,6 +10,7 @@ open System.Diagnostics
 open System.Globalization
 open System.Xml.Linq
 open System.Net
+open System.Collections.Generic
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open FSharp.Data.Runtime.Caching
@@ -555,3 +556,57 @@ type SdmxData(serviceUrl:string) =
     interface ISdmxData with
         member x.GetDataflows() = DataflowCollection(connection) :> seq<_>
         member x.GetDimensions() = DimensionCollection(connection) :> seq<_>
+
+
+type DataObject1() =
+    let data = Dictionary<string,obj>()
+    let items = seq {for i in 1 .. 10 -> i * i}
+    member x.RuntimeOperation() = data.Count
+    member x.Values = items
+    interface seq<int> with member x.GetEnumerator() = items.GetEnumerator()
+    interface IEnumerable with member x.GetEnumerator() = (items.GetEnumerator() :> _)
+
+
+[<DebuggerDisplay("{Name}")>]
+[<StructuredFormatDisplay("{Name}")>]
+/// Indicator data
+type DataObject() = 
+    let data = seq {for i in 1 .. 10 -> (i, float i)}
+    let dataDict = lazy (dict data)
+    
+    /// Get the code for the country or region of the indicator
+    member x.Code = "Code"
+    
+    /// Get the code for the indicator
+    member x.IndicatorCode = "InCode"
+    
+    /// Get the name of the indicator
+    member x.Name = "Name"
+    
+    /// Get the source of the indicator
+    member x.Source = "Source"
+    
+    /// Get the description of the indicator
+    member x.Description = "Description"
+    
+    /// Get the indicator value for the given year. If there's no data for that year, NaN is returned
+    member x.Item
+        with get year = 
+            match dataDict.Force().TryGetValue year with
+            | true, value -> value
+            | _ -> Double.NaN
+    
+    /// Get the indicator value for the given year, if present
+    member x.TryGetValueAt year = 
+        match dataDict.Force().TryGetValue year with
+        | true, value -> Some value
+        | _ -> None
+    
+    /// Get the years for which the indicator has values
+    member x.Years = dataDict.Force().Keys
+    
+    /// Get the values for the indicator (without years)
+    member x.Values = dataDict.Force().Values
+
+    interface seq<int * float> with member x.GetEnumerator() = data.GetEnumerator()
+    interface IEnumerable with member x.GetEnumerator() = (data.GetEnumerator() :> _)
