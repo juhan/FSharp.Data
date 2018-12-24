@@ -1,4 +1,4 @@
-﻿/// Implements caching using in-memory and local file system 
+/// Implements caching using in-memory and local file system 
 module FSharp.Data.Runtime.Caching
 
 open System
@@ -64,6 +64,7 @@ let createInternetFileCache prefix expiration =
     then Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "/.cache/fsharp-data"
     else Environment.GetFolderPath(Environment.SpecialFolder.InternetCache)
 
+  printfn "cacheFolder: %s prefix: 5s prefix" cacheFolder
   let downloadCache = Path.Combine(cacheFolder, prefix)
 
   // Get file name for a given string (using hash)
