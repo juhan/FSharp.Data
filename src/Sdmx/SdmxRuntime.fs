@@ -19,15 +19,11 @@ open FSharp.Data.Runtime.Caching
 /// [omit]
 module Implementation =
 
-    let private retryCount = 5
-    let private parallelIndicatorPageDownloads = 8
-
     let xn (s:string) = XName.Get(s)
     let xmes (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message")
     let xstr (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure")
     let xgen (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/data/generic")
     let xcom (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common")
-
     
     // todo make internal again
     type DimensionValueRecord =
@@ -70,7 +66,6 @@ module Implementation =
                     return res
                 | None ->
                     try
-                        // printfn "Query New doc"
                         // let! doc = Http.AsyncRequestString(url)
                         printfn "url: %s" url
                         let response = Http.Request(url)// raises error on 404                                             
@@ -78,19 +73,13 @@ module Implementation =
                             match response.StatusCode with
                             | 200 ->
                                 match response.Body with
-                                | Text text -> text
-                                // if not (String.IsNullOrEmpty response.Body) then
-                                //     restCache.Set(url, response.Body)
-                                // printfn "Length: %i" (String.length response.Body)
-                                // return response.StatusCode
+                                | Text text -> 
+                                    if not (String.IsNullOrEmpty text) then
+                                        restCache.Set(url, text)
+                                    text
                                 | Binary bytes -> 
-                                    string bytes.Length
-                            | 307 -> 
-                                printfn "Response 307"
-                                "-"
-                            | 404 -> 
-                                printfn "Response 404"
-                                "-"
+                                    printfn "Binary Response Length %s " (string bytes.Length)
+                                    "-"
                             | status   -> 
                                 printfn "Response %i" status
                                 "-"
@@ -109,64 +98,61 @@ module Implementation =
         
         let getDimensions agencyId dataflowId =
             async { 
-                // printfn "Download Datastructure: %s" (sdmxDatastructuresUrl agencyId dataflowId)
-                // let xml = Http.RequestString("https://api.worldbank.org/v2/sdmx/rest/datastructure/WB/WDI/1.0/?references=children")
-                // let xml = Http.RequestString(sdmxDatastructuresUrl agencyId dataflowId)
                 let! dimensionsXml = getSdmxDocuments ["datastructure"; agencyId; dataflowId; "1.0"] [ "references", "children"]                              
                 return match dimensionsXml with
-                | "-" -> []
-                | _ ->
-                    let xd = XDocument.Parse(dimensionsXml)
-                    let rootElement = xd.Root
-                    let headerElement = rootElement.Element(xmes "Header")
-                    let structuresElements = rootElement.Element(xmes "Structures")
-                    let codelistsElement = structuresElements.Element(xstr "Codelists")
-                    let codelistElements = codelistsElement.Elements(xstr "Codelist")
-                    let conceptsElement = structuresElements.Element(xstr "Concepts")
-                    let dataStructuresElement = structuresElements.Element(xstr "DataStructures")
-                    let dataStructureElement = dataStructuresElement.Element(xstr "DataStructure")
-                    let datastructureId = dataStructureElement.Attribute(xn "id").Value
-                    let dimensionListElement = dataStructureElement.Element(xstr "DataStructureComponents").Element(xstr "DimensionList")
-                    let dimensionElements = dimensionListElement.Elements(xstr "Dimension")
-                    // TODO use 
-                    let timeDimension = dimensionListElement.Element(xstr "TimeDimension")
+                        | "-" -> []
+                        | _ ->
+                            let xd = XDocument.Parse(dimensionsXml)
+                            let rootElement = xd.Root
+                            let headerElement = rootElement.Element(xmes "Header")
+                            let structuresElements = rootElement.Element(xmes "Structures")
+                            let codelistsElement = structuresElements.Element(xstr "Codelists")
+                            let codelistElements = codelistsElement.Elements(xstr "Codelist")
+                            let conceptsElement = structuresElements.Element(xstr "Concepts")
+                            let dataStructuresElement = structuresElements.Element(xstr "DataStructures")
+                            let dataStructureElement = dataStructuresElement.Element(xstr "DataStructure")
+                            let datastructureId = dataStructureElement.Attribute(xn "id").Value
+                            let dimensionListElement = dataStructureElement.Element(xstr "DataStructureComponents").Element(xstr "DimensionList")
+                            let dimensionElements = dimensionListElement.Elements(xstr "Dimension")
+                            // TODO use 
+                            let timeDimension = dimensionListElement.Element(xstr "TimeDimension")
 
-                    let dimensions = 
-                        seq {
-                            for dimensionElement in dimensionElements do
-                                let dimensionId = dimensionElement.Attribute(xn "id")
-                                let enumerationRefId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "id")
-                                let enumerationRefAgencyId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "agencyID")
-                                let positionAttribute = dimensionElement.Attribute(xn "position")            
-                                yield dimensionId.Value, enumerationRefAgencyId.Value, enumerationRefId.Value, positionAttribute.Value
-                        }
-                    let d = [ 
-                        for dimensionId, enumerationRefAgencyId, enumerationRefId, position in dimensions do
-                            let dimensionOption = codelistElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = enumerationRefId)
-                            match dimensionOption with
-                            | Some dimensionValue -> 
-                                let dimensionCodes = dimensionValue.Elements(xstr "Code")
-                                let dimensionName = dimensionValue.Element(xcom "Name").Value
-                                let dimensionRecords = seq {
-                                    for dimensionCode in dimensionCodes do
-                                        let dimensionValue = dimensionCode.Element(xcom "Name").Value
-                                        let dimensionValueId = dimensionCode.Attribute(xn "id").Value
-                                        yield {
-                                            Id=dimensionValueId
-                                            Name=dimensionValue
+                            let dimensions = 
+                                seq {
+                                    for dimensionElement in dimensionElements do
+                                        let dimensionId = dimensionElement.Attribute(xn "id")
+                                        let enumerationRefId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "id")
+                                        let enumerationRefAgencyId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "agencyID")
+                                        let positionAttribute = dimensionElement.Attribute(xn "position")            
+                                        yield dimensionId.Value, enumerationRefAgencyId.Value, enumerationRefId.Value, positionAttribute.Value
+                                }
+                            let d = [ 
+                                for dimensionId, enumerationRefAgencyId, enumerationRefId, position in dimensions do
+                                    let dimensionOption = codelistElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = enumerationRefId)
+                                    match dimensionOption with
+                                    | Some dimensionValue -> 
+                                        let dimensionCodes = dimensionValue.Elements(xstr "Code")
+                                        let dimensionName = dimensionValue.Element(xcom "Name").Value
+                                        let dimensionRecords = seq {
+                                            for dimensionCode in dimensionCodes do
+                                                let dimensionValue = dimensionCode.Element(xcom "Name").Value
+                                                let dimensionValueId = dimensionCode.Attribute(xn "id").Value
+                                                yield {
+                                                    Id=dimensionValueId
+                                                    Name=dimensionValue
+                                                }
                                         }
-                                }
-                                yield {
-                                    DimensionName=dimensionName
-                                    DataStructureId=datastructureId 
-                                    AgencyId=enumerationRefAgencyId
-                                    Id=dimensionId
-                                    EnumerationId=enumerationRefId
-                                    Position=position
-                                    DimensionValues=Seq.toList dimensionRecords
-                                }
-                    ]
-                    d
+                                        yield {
+                                            DimensionName=dimensionName
+                                            DataStructureId=datastructureId 
+                                            AgencyId=enumerationRefAgencyId
+                                            Id=dimensionId
+                                            EnumerationId=enumerationRefId
+                                            Position=position
+                                            DimensionValues=Seq.toList dimensionRecords
+                                        }
+                            ]
+                            d
             }
         
         let getDataflows(args) =
@@ -244,118 +230,6 @@ module Implementation =
         member internal x.GetDimensions(agencyId, dataflowId) =
              x.GetDimensionsAsync(agencyId, dataflowId) |> Async.RunSynchronously
 
-[<DebuggerDisplay("{Name}")>]
-[<StructuredFormatDisplay("{Name}")>]
-type DimensionValue internal (connection:ServiceConnection, dimensionId:string) =    
-    member x.Id = dimensionId
-
-/// [omit]
-type IDimensionValue =
-    abstract GetDimensionValue : indicatorCode:string -> DimensionValue
-    abstract AsyncGetDimensionValue : indicatorCode:string -> Async<DimensionValue>
-    
-
-[<DebuggerDisplay("{Name}")>]
-[<StructuredFormatDisplay("{Name}")>]
-/// Dimension data
-type Dimension internal (connection:ServiceConnection, dimensionId:string) =    
-    let dimensionValues = seq { for dimensionValue in [] -> DimensionValue(connection, dimensionValue.Id) }
-    member x.Id = dimensionId
-    // member x.Name = connection.DimensionsIndexed.[dimensionId].Id
-    member x.Description = "Test"
-    
-    interface IDimensionValue with
-        member x.GetDimensionValue(dimensionId) = DimensionValue(connection, dimensionId)
-        member x.AsyncGetDimensionValue(dimensionId) = async { return DimensionValue(connection, dimensionId) }
-    interface seq<DimensionValue> with member x.GetEnumerator() = dimensionValues.GetEnumerator()
-    interface IEnumerable with member x.GetEnumerator() = dimensionValues.GetEnumerator() :> _
-
-/// [omit]
-type IDimensions =
-    abstract GetDimension : dimensionId:string -> Dimension
-    abstract AsyncGetDimension : dimensionId:string -> Async<Dimension>
-
-/// [omit]
-type Dimensions internal (connection:ServiceConnection, dataflowId) =
-    // TODO filter by dataflowId
-    let dimensions = seq { for dimension in connection.Dimensions -> Dimension(connection, dimension.Id) }
-    interface IDimensions with
-        member x.GetDimension(dimensionId) = Dimension(connection, dimensionId)
-        member x.AsyncGetDimension(dimensionId) = async { return Dimension(connection, dimensionId) }
-    interface seq<Dimension> with member x.GetEnumerator() = dimensions.GetEnumerator()
-    interface IEnumerable with member x.GetEnumerator() = dimensions.GetEnumerator() :> _
-
-/// [omit]
-type IDataflow =
-    abstract GetDimensions : unit -> Dimensions
-
-
-[<DebuggerDisplay("{Name}")>]
-[<StructuredFormatDisplay("{Name}")>]
-/// Metadata for a Dataflow
-type Dataflow internal (connection:ServiceConnection, dataflowId:string) =
-    let dimensions = new Dimensions(connection, dataflowId)
-    /// Get the WorldBank code of the country
-    member x.Id = dataflowId
-    /// Get the name of the country
-    // member x.Name = connection.DataflowsIndexed.[dataflowId].Name
-    interface IDataflow with member x.GetDimensions() = dimensions
-
-/// [omit]
-type IDataflowCollection =
-    abstract GetDataflow : dataflowId:string * dataflowName:string -> Dataflow
-
-
-/// [omit]
-type IDimensionCollection =
-    abstract GetDimension : dimensionId:string -> Dimension
-
-/// [omit]
-type DataflowCollection<'T when 'T :> Dataflow> internal (serviceUrl: string) =
-    let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
-    let connection = new ServiceConnection(restCache, serviceUrl)
-    let items =
-        seq { let dataflows = connection.Dataflows
-              for dataflow in dataflows do              
-                  yield Dataflow(connection, dataflow.Id) :?> 'T }
-    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
-    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
-    interface IDataflowCollection with member x.GetDataflow(dataflowId, (*this parameter is only here to help FunScript*)_dataflowName) = Dataflow(connection, dataflowId)
-
-/// [omit]
-type DimensionCollection<'T when 'T :> Dimension> internal (connection: ServiceConnection) =
-    let items =
-        seq { let dimensions = connection.Dimensions
-              for dimension in dimensions do
-                  yield Dimension(connection, dimension.Id) :?> 'T }
-    interface seq<'T> with member x.GetEnumerator() = items.GetEnumerator()
-    interface IEnumerable with member x.GetEnumerator() = (items :> IEnumerable).GetEnumerator()
-    interface IDimensionCollection with member x.GetDimension(dimensionId) = Dimension(connection, dimensionId)
-
-
-/// [omit]
-type ISdmxData =
-    abstract GetDataflows<'T when 'T :> Dataflow> : unit -> seq<'T>
-    abstract GetDimensions<'T when 'T :> Dimension> : unit -> seq<'T>
-
-/// [omit]
-type SdmxData(serviceUrl:string) =
-    let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
-    let connection = new ServiceConnection(restCache, serviceUrl)
-    interface ISdmxData with
-        member x.GetDataflows() = DataflowCollection("") :> seq<_>
-        member x.GetDimensions() = DimensionCollection(connection) :> seq<_>
-
-
-type DataObject1() =
-    let data = Dictionary<string,obj>()
-    let items = seq {for i in 1 .. 10 -> i * i}
-    member x.RuntimeOperation() = data.Count
-    member x.Values = items
-    interface seq<int> with member x.GetEnumerator() = items.GetEnumerator()
-    interface IEnumerable with member x.GetEnumerator() = (items.GetEnumerator() :> _)
-
-    
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 /// Dataflow data

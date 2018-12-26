@@ -5,10 +5,7 @@
 namespace ProviderImplementation
 
 open System
-open System.Net
-open System.Xml.Linq
 open FSharp.Core.CompilerServices
-open FSharp.Quotations
 open ProviderImplementation
 open ProviderImplementation.ProvidedTypes
 open FSharp.Data.Runtime.Caching
@@ -41,10 +38,8 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, Some typeof<DataFlowObject>, hideObjectMethods = false, nonNullable = true)
             let ctorEmpty = ProvidedConstructor(parameters = [], invokeCode= (fun args -> <@@ DataFlowObject(wsEntryPoint, dataflowId) @@>))
             dataflowsTypeDefinition.AddMember(ctorEmpty)
-
-
             let instanceMeth = 
-                ProvidedMethod(methodName = "InstanceMethod", 
+                ProvidedMethod(methodName = "FetchData", 
                                parameters = [
                                     ProvidedParameter("a",typeof<DimensionObject>)
                                     ProvidedParameter("b",typeof<DimensionObject>)
