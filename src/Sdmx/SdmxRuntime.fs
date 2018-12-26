@@ -25,6 +25,20 @@ module Implementation =
     let xgen (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/data/generic")
     let xcom (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common")
     
+    type ContactRecord =
+        {Name : string
+         Email : string}
+
+    type SenderRecord =
+        {Name: string
+         Contact: ContactRecord}
+
+    type HeaderRecord =
+        {ID : string
+         Test : string
+         Prepared : string
+         Sender : SenderRecord}
+
     // todo make internal again
     type DimensionValueRecord =
         { Id : string
@@ -108,14 +122,11 @@ module Implementation =
                             let structuresElements = rootElement.Element(xmes "Structures")
                             let codelistsElement = structuresElements.Element(xstr "Codelists")
                             let codelistElements = codelistsElement.Elements(xstr "Codelist")
-                            let conceptsElement = structuresElements.Element(xstr "Concepts")
                             let dataStructuresElement = structuresElements.Element(xstr "DataStructures")
                             let dataStructureElement = dataStructuresElement.Element(xstr "DataStructure")
                             let datastructureId = dataStructureElement.Attribute(xn "id").Value
                             let dimensionListElement = dataStructureElement.Element(xstr "DataStructureComponents").Element(xstr "DimensionList")
                             let dimensionElements = dimensionListElement.Elements(xstr "Dimension")
-                            // TODO use 
-                            let timeDimension = dimensionListElement.Element(xstr "TimeDimension")
 
                             let dimensions = 
                                 seq {
@@ -178,7 +189,8 @@ module Implementation =
                             AgencyID = dataflowAgencyId
                             Version = dataflowVersion
                         }
-                    ]}                    
+                    ]}
+                    
         let getData flowRef key = 
             async { let! dataXml = getSdmxDocuments ["data"; flowRef; key; "all"] []
                     let xd = XDocument.Parse(dataXml)

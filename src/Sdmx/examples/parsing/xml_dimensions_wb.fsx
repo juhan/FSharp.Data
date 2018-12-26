@@ -190,6 +190,8 @@ let dimensionElements = dimensionListElement.Elements(xstr "Dimension")
 // TODO use 
 let timeDimension = dimensionListElement.Element(xstr "TimeDimension")
 
+timeDimension
+
 let dimensions = 
     seq {
         for dimensionElement in dimensionElements do
