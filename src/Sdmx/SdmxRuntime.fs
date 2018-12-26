@@ -21,6 +21,13 @@ module Implementation =
 
     let private retryCount = 5
     let private parallelIndicatorPageDownloads = 8
+
+    let xn (s:string) = XName.Get(s)
+    let xmes (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message")
+    let xstr (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure")
+    let xgen (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/data/generic")
+    let xcom (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common")
+
     
     // todo make internal again
     type DimensionValueRecord =
@@ -101,13 +108,6 @@ module Implementation =
             }            
         
         let getDimensions agencyId dataflowId =
-            // printfn "getDimensions agencyId: %s - dataflowId: %s " agencyId dataflowId
-            // helper functions
-            let xn (s:string) = XName.Get(s)
-            let xmes (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message")
-            let xstr (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure")
-            let xcom (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common")
-        
             async { 
                 // printfn "Download Datastructure: %s" (sdmxDatastructuresUrl agencyId dataflowId)
                 // let xml = Http.RequestString("https://api.worldbank.org/v2/sdmx/rest/datastructure/WB/WDI/1.0/?references=children")
@@ -170,14 +170,6 @@ module Implementation =
             }
         
         let getDataflows(args) =
-            // https://api.worldbank.org/v2/sdmx/rest/dataflow/all/all/latest/
-            // helper functions
-            printfn "Getting Dataflows"
-            let xn (s:string) = XName.Get(s)
-            let xmes (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message")
-            let xstr (tag:string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/structure")
-            let xcom (tag: string) = XName.Get(tag, "http://www.sdmx.org/resources/sdmxml/schemas/v2_1/common")
-
             async {
                 let! dataflowsXml = getSdmxDocuments ["dataflow"; "all"; "all"; "latest"] []
                 // printfn "dataflowsXml Dataflows"
@@ -201,6 +193,25 @@ module Implementation =
                             Version = dataflowVersion
                         }
                     ]}                    
+        let getData flowRef key = 
+            async { let! dataXml = getSdmxDocuments ["data"; flowRef; key; "all"] []
+                    let xd = XDocument.Parse(dataXml)
+                    let rootElement = xd.Root
+                    let headerElement = rootElement.Element(xmes "Header")
+                    let dataSetElement = rootElement.Element(xmes "DataSet")
+                    let seriesElement = dataSetElement.Element(xgen "Series")
+                    let obsElements = seriesElement.Elements(xgen "Obs")
+                    return
+                        [ for obsElement in obsElements do
+                            let obsDimensionElement = obsElement.Element(xgen "ObsDimension")
+                            let obsDimensionValue = obsDimensionElement.Attribute(xn "value")
+                            let obsValueElement = obsElement.Element(xgen "ObsValue")
+                            let obsValue = obsValueElement.Attribute(xn "value")
+                            match obsDimensionValue, obsValue with
+                            | null, null -> printfn "Error no A B"
+                            | a,    null -> printfn "Error no B - %s" a.Value
+                            | null, b    -> printfn "Error no A -  %s" b.Value
+                            | a,    b    -> yield (a.Value, b.Value)]}
 
         /// At compile time, download the schema
         let dimensions = lazy (getDimensions "" "" |> Async.RunSynchronously |> List.toSeq |> Seq.distinctBy (fun i -> i.Id) |> Seq.toList)
@@ -215,6 +226,18 @@ module Implementation =
         member internal __.DataflowsIndexed = dataflowsIndexed.Force()
 
         /// At runtime, download the data
+        member internal __.GetDataAsync(flowRef, key) = 
+            async {
+                    let! data = getData flowRef key
+                    return 
+                      seq { for k, v in data do
+                              if not (String.IsNullOrEmpty v) then 
+                                 yield int k, float v } 
+                      // It's a time series - sort it :-)  We should probably also interpolate (e.g. see R time series library)
+                      |> Seq.sortBy fst } 
+
+        member internal x.GetData(flowRef, dimensions) = 
+             x.GetDataAsync(flowRef, dimensions) |> Async.RunSynchronously
         member internal __.GetDimensionsAsync(agencyId, dataflowId) = 
             async { let! data = getDimensions agencyId dataflowId                        
                     return data }
@@ -332,26 +355,11 @@ type DataObject1() =
     interface seq<int> with member x.GetEnumerator() = items.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = (items.GetEnumerator() :> _)
 
-
+    
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
 /// Dataflow data
-type DataFlowObject(serviceUrl: string, dataflowId: string) =
-    let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
-    let connection = new ServiceConnection(restCache, serviceUrl)
-
-    member x.DataflowId = dataflowId
-    member x.Name = connection.DataflowsIndexed.[dataflowId].Name
-    member x.AgencyId = connection.DataflowsIndexed.[dataflowId].AgencyID
-    member x.Version = connection.DataflowsIndexed.[dataflowId].Version
-
-
-
-
-[<DebuggerDisplay("{Name}")>]
-[<StructuredFormatDisplay("{Name}")>]
-/// Dataflow data
-type DimensionObject(serviceUrl: string, agencyId:string, dataflowId: string, dimensionId: string) =
+type DimensionObject(serviceUrl: string, agencyId:string, dataflowId: string, dimensionId: string, dimensionValueId: string) =
     let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
     let connection = new ServiceConnection(restCache, serviceUrl)
 
@@ -367,5 +375,35 @@ type DimensionObject(serviceUrl: string, agencyId:string, dataflowId: string, di
     member x.EnumerationId = dimensions.[dimensionId].EnumerationId
     member x.Position = dimensions.[dimensionId].Position
 
+    member x.DimensionValueId = dimensionValueId
+    member x.DimensionValueName = items |> Seq.tryFind (fun (a, b) -> a = dimensionValueId)
+
     interface seq<string * string> with member x.GetEnumerator() = items.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = (items.GetEnumerator() :> _)
+
+[<DebuggerDisplay("{Name}")>]
+[<StructuredFormatDisplay("{Name}")>]
+/// Dataflow data
+type DataFlowObject(serviceUrl: string, dataflowId: string, ?dimensions: list<DimensionObject>) =
+    let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
+    let connection = new ServiceConnection(restCache, serviceUrl)
+
+    let data = match dimensions with
+               | Some dim ->
+                            let key = dim
+                                      |> Seq.sortBy (fun arg -> int arg.Position)
+                                      |> Seq.map (fun e -> e.DimensionValueId )
+                                      |> Seq.toList |> String.concat "."
+                            connection.GetData(dataflowId, key) |> Seq.cache
+               | _ -> Seq.empty
+    
+    //let dataDict = lazy (dict data)
+
+    member x.DataflowId = dataflowId
+    member x.Name = connection.DataflowsIndexed.[dataflowId].Name
+    member x.AgencyId = connection.DataflowsIndexed.[dataflowId].AgencyID
+    member x.Version = connection.DataflowsIndexed.[dataflowId].Version
+    member x.Data = data
+
+
+
