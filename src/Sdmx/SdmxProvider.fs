@@ -45,14 +45,10 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                                         yield ProvidedParameter(dimension.DimensionName, typeof<DimensionObject>)                                        
                                ], 
                                returnType = typeof<DataFlowObject>, 
-                               invokeCode = (fun args -> 
+                               invokeCode = (fun args ->
+                                   let dims = List.fold ( fun state e -> <@@ (%%e:DimensionObject)::%%state @@>) <@@ []:List<DimensionObject> @@> args.Tail
                                    <@@
-                                       // Todo Issue: cannot extract parameters to provide as an argument to DataFlowObject
-                                       //let dims = [for %%arg in args do yield (arg : DimensionObject) ]
-                                       let dims1 = %%args.[1] : DimensionObject
-                                       let dims2 = %%args.[2] : DimensionObject
-                                       let dims3 = %%args.[3] : DimensionObject
-                                       DataFlowObject(wsEntryPoint, dataflowId, [dims1; dims2; dims3])
+                                       DataFlowObject(wsEntryPoint, dataflowId, %%dims)
                                    @@>
                                    )
                                )

@@ -21,7 +21,15 @@ let sdmxData = wdiDataflow.FetchData(a, b, c).Data
 let wch = wbData |> Chart.Line
 let sch = sdmxData |> Chart.Line
 Chart.Combine( [Chart.Line(sdmxData); Chart.Line(wbData)] )
-
+invokeCode = (fun args -> 
+   <@@
+        // Todo Issue: cannot extract parameters to provide as an argument to DataFlowObject
+        //let dims = [for %%arg in args do yield (arg : DimensionObject) ]
+        let dims1 = %%args.[1] : DimensionObject
+        let dims2 = %%args.[2] : DimensionObject
+        let dims3 = %%args.[3] : DimensionObject
+        DataFlowObject(wsEntryPoint, dataflowId, [dims1; dims2; dims3])
+    @@>)
 
 // WB.``World Development Indicators``.``Reference area code list``.Albania
 
@@ -52,3 +60,26 @@ Chart.Combine( [Chart.Line(sdmxData); Chart.Line(wbData)] )
 // went for xml because not all the providers support json and xml would give more coberage 
 // 4. Evaluation, case study stat.ee 
 // Debugging TypeProvider
+
+
+type DimensionObject = {DimensionName:string}
+
+// ProvidedMethod(methodName = "FetchData", 
+//                parameters = [
+//                     for dimension in connection.GetDimensions(agencyId, dataflowId) do
+//                         yield ProvidedParameter(dimension.DimensionName, typeof<DimensionObject>)                                        
+//                ], 
+//                returnType = typeof<DataFlowObject>, 
+//                invokeCode = (fun args -> 
+//                    <@@
+//                        //let dims = [for %%arg in args do yield (arg : DimensionObject) ]
+//                        let dims1 = %%args.[1] : DimensionObject
+//                        let dims2 = %%args.[2] : DimensionObject
+//                        let dims3 = %%args.[3] : DimensionObject
+//                        DataFlowObject(wsEntryPoint, dataflowId, [dims1; dims2; dims3])
+//                    @@>
+//                    )
+//                )              
+//usage
+let a = new DimensionObject(DimensionName="asd")
+// typeInstance.FetchData()
