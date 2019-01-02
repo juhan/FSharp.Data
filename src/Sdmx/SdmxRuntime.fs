@@ -45,20 +45,20 @@ module Implementation =
           Name: string}
       
     type internal DimensionRecord =
-        { 
-          DimensionName : string
+        { Name : string
           DataStructureId : string
           AgencyId : string
           Id : string
           EnumerationId: string
           Position: string
-          DimensionValues : DimensionValueRecord seq}
+          Values : DimensionValueRecord seq
+          Header : HeaderRecord}
 
     type internal DataflowRecord =
         { Id : string
           Name : string 
-          AgencyID: string
-          Version: string }
+          AgencyID : string
+          Version : string}
 
     type internal ServiceConnection(restCache:ICache<_,_>,serviceUrl:string) =               
 
@@ -128,6 +128,13 @@ module Implementation =
                             let dimensionListElement = dataStructureElement.Element(xstr "DataStructureComponents").Element(xstr "DimensionList")
                             let dimensionElements = dimensionListElement.Elements(xstr "Dimension")
 
+                            let header = {
+                                ID="1"
+                                Test=""
+                                Prepared=""
+                                Sender={Name=""; Contact={Name=""; Email=""}}
+                            }
+
                             let dimensions = 
                                 seq {
                                     for dimensionElement in dimensionElements do
@@ -154,13 +161,14 @@ module Implementation =
                                                 }
                                         }
                                         yield {
-                                            DimensionName=dimensionName
+                                            Name=dimensionName
                                             DataStructureId=datastructureId 
                                             AgencyId=enumerationRefAgencyId
                                             Id=dimensionId
                                             EnumerationId=enumerationRefId
                                             Position=position
-                                            DimensionValues=Seq.toList dimensionRecords
+                                            Values=Seq.toList dimensionRecords
+                                            Header=header
                                         }
                             ]
                             d
@@ -251,12 +259,12 @@ type DimensionObject(serviceUrl: string, agencyId:string, dataflowId: string, di
 
     let dimensions = connection.DimensionsIndexed agencyId dataflowId
 
-    let items = seq { for i in dimensions.[dimensionId].DimensionValues do yield (i.Id, i.Name) }
+    let items = seq { for i in dimensions.[dimensionId].Values do yield (i.Id, i.Name) }
     
 
     member x.DataflowId = dataflowId
     member x.Id = dimensions.[dimensionId].Id
-    member x.Name = dimensions.[dimensionId].DimensionName
+    member x.Name = dimensions.[dimensionId].Name
     member x.DataStructureId = dimensions.[dimensionId].DataStructureId
     member x.EnumerationId = dimensions.[dimensionId].EnumerationId
     member x.Position = dimensions.[dimensionId].Position

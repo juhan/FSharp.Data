@@ -42,7 +42,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                 ProvidedMethod(methodName = "FetchData", 
                                parameters = [
                                     for dimension in connection.GetDimensions(agencyId, dataflowId) do
-                                        yield ProvidedParameter(dimension.DimensionName, typeof<DimensionObject>)                                        
+                                        yield ProvidedParameter(dimension.Name, typeof<DimensionObject>)                                        
                                ], 
                                returnType = typeof<DataFlowObject>, 
                                invokeCode = (fun args ->
@@ -67,11 +67,11 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                  fun () ->
                     [ for dimension in connection.GetDimensions(agencyId, dataflowId) do                         
                          if dataflowId = dimension.DataStructureId then
-                            let dimensionTypeDefinition = ProvidedTypeDefinition(dimension.DimensionName, Some typeof<DimensionObject>, hideObjectMethods = true, nonNullable = true)
+                            let dimensionTypeDefinition = ProvidedTypeDefinition(dimension.Name, Some typeof<DimensionObject>, hideObjectMethods = true, nonNullable = true)
                             let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
                             dimensionTypeDefinition.AddMember ctor
                             let dimensionId = dimension.Id 
-                            for dimensionValue in dimension.DimensionValues do
+                            for dimensionValue in dimension.Values do
                                 let dimensionValueId = dimensionValue.Id
                                 let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<DimensionObject>, isStatic=true, getterCode = fun _ -> <@@ DimensionObject(wsEntryPoint, agencyId, dataflowId, dimensionId, dimensionValueId) @@>)                                
                                 dimensionTypeDefinition.AddMember dimensionValueProperty
