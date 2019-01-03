@@ -34,7 +34,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             t.AddXmlDoc("<summary>Contains the types that describe the data service</summary>")
             resTy.AddMember t
             t
-        let datafowType dataflowName agencyId dataflowId =
+        let datafowType dataflowName agencyId dataflowId dataId =
             let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, Some typeof<DataFlowObject>, hideObjectMethods = false, nonNullable = true)
             let ctorEmpty = ProvidedConstructor(parameters = [], invokeCode= (fun _ -> <@@ DataFlowObject(wsEntryPoint, dataflowId) @@>))
             dataflowsTypeDefinition.AddMember(ctorEmpty)
@@ -48,7 +48,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                                invokeCode = (fun args ->
                                    let dims = List.fold ( fun state e -> <@@ (%%e:DimensionObject)::%%state @@>) <@@ []:List<DimensionObject> @@> args.Tail
                                    <@@
-                                       DataFlowObject(wsEntryPoint, dataflowId, %%dims)
+                                       DataFlowObject(wsEntryPoint, dataId, %%dims)
                                    @@>
                                    )
                                )
@@ -62,7 +62,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
         for dataflow in connection.Dataflows do
             let dataflowId, dataflowName, agencyId, version = dataflow.Id, dataflow.Name, dataflow.AgencyID, dataflow.Version
             //printfn "dataflowId: %s dataflowName: %s agencyId: %s version: %s" dataflowId, dataflowName, agencyId, version
-            let dataflowsTypeDefinition = datafowType dataflowName agencyId dataflowId
+            let dataflowsTypeDefinition = datafowType dataflowName agencyId dataflowId dataflow.DataId
             dataflowsTypeDefinition.AddMembersDelayed(
                  fun () ->
                     [ for dimension in connection.GetDimensions(agencyId, dataflowId) do                         

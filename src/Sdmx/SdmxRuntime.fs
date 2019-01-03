@@ -56,7 +56,8 @@ module Implementation =
 
     type internal DataflowRecord =
         { Id : string
-          Name : string 
+          Name : string
+          DataId : string
           AgencyID : string
           Version : string}
 
@@ -197,9 +198,14 @@ module Implementation =
                         let dataflowDisplayName:string = dataflowsEelement.Element(xcom "Name").Value.Trim()
                         let dataflowId:string = refElement.Attribute(xn "id").Value
                         let dataflowAgencyId:string = refElement.Attribute(xn "agencyID").Value
-                        let dataflowVersion:string = refElement.Attribute(xn "version").Value                        
+                        let dataflowVersion:string = refElement.Attribute(xn "version").Value
+
+                        let dataId = dataflowsEelement.Attribute(xn "id").Value
+
+
                         yield {
                             Id = dataflowId
+                            DataId = dataId
                             Name = dataflowDisplayName
                             AgencyID = dataflowAgencyId
                             Version = dataflowVersion
