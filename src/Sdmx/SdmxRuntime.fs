@@ -46,6 +46,7 @@ module Implementation =
       
     type internal DimensionRecord =
         { Name : string
+          Description : string
           DataStructureId : string
           AgencyId : string
           Id : string
@@ -56,9 +57,10 @@ module Implementation =
 
     type internal DataflowRecord =
         { Id : string
-          Name : string 
-          AgencyID : string
-          Version : string}
+          Name : string
+          RefID : string
+          RefAgencyID : string
+          RefVerion : string}
 
     type internal ServiceConnection(restCache:ICache<_,_>,serviceUrl:string) =               
 
@@ -122,6 +124,9 @@ module Implementation =
                             let structuresElements = rootElement.Element(xmes "Structures")
                             let codelistsElement = structuresElements.Element(xstr "Codelists")
                             let codelistElements = codelistsElement.Elements(xstr "Codelist")
+                            let conceptsElement = structuresElements.Element(xstr "Concepts")
+                            let conceptsSchemeElement = conceptsElement.Element(xstr "ConceptScheme")
+                            let conceptsElements = conceptsSchemeElement.Elements(xstr "Concept")
                             let dataStructuresElement = structuresElements.Element(xstr "DataStructures")
                             let dataStructureElement = dataStructuresElement.Element(xstr "DataStructure")
                             let datastructureId = dataStructureElement.Attribute(xn "id").Value
@@ -135,33 +140,40 @@ module Implementation =
                                 Sender={Name=""; Contact={Name=""; Email=""}}
                             }
 
-                            let dimensions = 
+                            let dimensionRefs = 
                                 seq {
                                     for dimensionElement in dimensionElements do
                                         let dimensionId = dimensionElement.Attribute(xn "id")
                                         let enumerationRefId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "id")
                                         let enumerationRefAgencyId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "agencyID")
-                                        let positionAttribute = dimensionElement.Attribute(xn "position")            
-                                        yield dimensionId.Value, enumerationRefAgencyId.Value, enumerationRefId.Value, positionAttribute.Value
+                                        let positionAttribute = dimensionElement.Attribute(xn "position")
+                                        let conceptIdAttribute = dimensionElement.Element(xstr "ConceptIdentity").Element(xn "Ref").Attribute(xn "id")
+                                        yield dimensionId.Value, enumerationRefAgencyId.Value, enumerationRefId.Value, positionAttribute.Value, conceptIdAttribute.Value
                                 }
                             let d = [ 
-                                for dimensionId, enumerationRefAgencyId, enumerationRefId, position in dimensions do
-                                    let dimensionOption = codelistElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = enumerationRefId)
-                                    match dimensionOption with
-                                    | Some dimensionValue -> 
-                                        let dimensionCodes = dimensionValue.Elements(xstr "Code")
-                                        let dimensionName = dimensionValue.Element(xcom "Name").Value
+                                for dimensionId, enumerationRefAgencyId, enumerationRefId, position, conceptId in dimensionRefs do
+                                    let dimensionEnumerationOption = codelistElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = enumerationRefId)
+                                    let dimensionConceptOption = conceptsElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = conceptId)
+                                    match dimensionEnumerationOption, dimensionConceptOption with
+                                    | Some enumerationValue, Some conceptValue  -> 
+                                        let dimensionName = conceptValue.Element(xcom "Name").Value
+                                        let dimensionDescription = match conceptValue.Element(xcom "Description") with
+                                                                   | x when not(x = null) -> x.Value
+                                                                   | _ -> "No Description"
+                                        let dimensionCodeElements = enumerationValue.Elements(xstr "Code")
                                         let dimensionRecords = seq {
-                                            for dimensionCode in dimensionCodes do
-                                                let dimensionValue = dimensionCode.Element(xcom "Name").Value
-                                                let dimensionValueId = dimensionCode.Attribute(xn "id").Value
+                                            for dimensionCodeElement in dimensionCodeElements do
+                                                let dimensionCodeId = dimensionCodeElement.Attribute(xn "id").Value
+                                                let dimensionCodeName = dimensionCodeElement.Element(xcom "Name").Value                                                                                                    
                                                 yield {
-                                                    Id=dimensionValueId
-                                                    Name=dimensionValue
+                                                    Id=dimensionCodeId
+                                                    Name=(dimensionCodeId + "_" + dimensionCodeName)
                                                 }
+                                                
                                         }
                                         yield {
                                             Name=dimensionName
+                                            Description=dimensionDescription
                                             DataStructureId=datastructureId 
                                             AgencyId=enumerationRefAgencyId
                                             Id=dimensionId
@@ -170,6 +182,7 @@ module Implementation =
                                             Values=Seq.toList dimensionRecords
                                             Header=header
                                         }
+                                    | _, _ -> printfn "Failed to match pattern"
                             ]
                             d
             }
@@ -186,16 +199,22 @@ module Implementation =
                 return 
                     [ for dataflowsEelement in dataflowsEelements do
                         let structureElement = dataflowsEelement.Element(xstr "Structure")
+                        let dataflowDisplayName = dataflowsEelement.Element(xcom "Name").Value.Trim()
+                        let dataflowAgencyId = dataflowsEelement.Attribute(xn "agencyID").Value
+                        let dataflowId = dataflowsEelement.Attribute(xn "id").Value
+
                         let refElement = structureElement.Element(xn "Ref")
-                        let dataflowDisplayName:string = dataflowsEelement.Element(xcom "Name").Value.Trim()
-                        let dataflowId:string = refElement.Attribute(xn "id").Value
-                        let dataflowAgencyId:string = refElement.Attribute(xn "agencyID").Value
-                        let dataflowVersion:string = refElement.Attribute(xn "version").Value                        
+
+                        let refId = refElement.Attribute(xn "id").Value                       
+                        let refAgencyId = refElement.Attribute(xn "agencyID").Value
+                        let refVersion = refElement.Attribute(xn "version").Value
+
                         yield {
                             Id = dataflowId
                             Name = dataflowDisplayName
-                            AgencyID = dataflowAgencyId
-                            Version = dataflowVersion
+                            RefID = refId
+                            RefAgencyID = refAgencyId
+                            RefVerion = refVersion
                         }
                     ]}
                     
@@ -260,7 +279,6 @@ type DimensionObject(serviceUrl: string, agencyId:string, dataflowId: string, di
     let dimensions = connection.DimensionsIndexed agencyId dataflowId
 
     let items = seq { for i in dimensions.[dimensionId].Values do yield (i.Id, i.Name) }
-    
 
     member x.DataflowId = dataflowId
     member x.Id = dimensions.[dimensionId].Id
@@ -284,19 +302,19 @@ type DataFlowObject(serviceUrl: string, dataflowId: string, ?dimensions: list<Di
 
     let data = match dimensions with
                | Some dim ->
-                            let key = dim
-                                      |> Seq.sortBy (fun arg -> int arg.Position)
-                                      |> Seq.map (fun e -> e.DimensionValueId )
-                                      |> Seq.toList |> String.concat "."
-                            connection.GetData(dataflowId, key) |> Seq.cache
+                        let key = dim
+                                    |> Seq.sortBy (fun arg -> int arg.Position)
+                                    |> Seq.map (fun e -> e.DimensionValueId )
+                                    |> Seq.toList |> String.concat "."
+                        connection.GetData(dataflowId, key) |> Seq.cache
                | _ -> Seq.empty
     
     //let dataDict = lazy (dict data)
 
     member x.DataflowId = dataflowId
     member x.Name = connection.DataflowsIndexed.[dataflowId].Name
-    member x.AgencyId = connection.DataflowsIndexed.[dataflowId].AgencyID
-    member x.Version = connection.DataflowsIndexed.[dataflowId].Version
+    member x.AgencyId = connection.DataflowsIndexed.[dataflowId].RefAgencyID
+    member x.Version = connection.DataflowsIndexed.[dataflowId].RefVerion
     member x.Data = data
 
 

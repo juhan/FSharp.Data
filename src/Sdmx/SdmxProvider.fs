@@ -34,38 +34,31 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
             t.AddXmlDoc("<summary>Contains the types that describe the data service</summary>")
             resTy.AddMember t
             t
-        let datafowType dataflowName agencyId dataflowId =
-            let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, Some typeof<DataFlowObject>, hideObjectMethods = false, nonNullable = true)
-            let ctorEmpty = ProvidedConstructor(parameters = [], invokeCode= (fun _ -> <@@ DataFlowObject(wsEntryPoint, dataflowId) @@>))
-            dataflowsTypeDefinition.AddMember(ctorEmpty)
-            let instanceMeth = 
-                ProvidedMethod(methodName = "FetchData", 
-                               parameters = [
-                                    for dimension in connection.GetDimensions(agencyId, dataflowId) do
-                                        yield ProvidedParameter(dimension.Name, typeof<DimensionObject>)                                        
-                               ], 
-                               returnType = typeof<DataFlowObject>, 
-                               invokeCode = (fun args ->
-                                   let dims = List.fold ( fun state e -> <@@ (%%e:DimensionObject)::%%state @@>) <@@ []:List<DimensionObject> @@> args.Tail
-                                   <@@
-                                       DataFlowObject(wsEntryPoint, dataflowId, %%dims)
-                                   @@>
-                                   )
-                               )
 
-            instanceMeth.AddXmlDocDelayed(fun () -> "This is an instance method")
-            // Add the instance method to the type.
-            dataflowsTypeDefinition.AddMember instanceMeth
+        let datafowType dataflowName agencyId dataflowId dataId =
+            let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, Some typeof<DataFlowObject>, hideObjectMethods = false, nonNullable = true)
+            let dataCtor =
+                ProvidedConstructor(
+                    parameters = [
+                        for dimension in connection.GetDimensions(agencyId, dataflowId) do
+                            yield ProvidedParameter(dimension.Name, typeof<DimensionObject>)
+                    ], invokeCode = (fun args ->
+                                        let dims = List.fold ( fun state e -> <@@ (%%e:DimensionObject)::%%state @@>) <@@ []:List<DimensionObject> @@> args
+                                        <@@
+                                            DataFlowObject(wsEntryPoint, dataflowId, %%dims)
+                                        @@>)
+            )
+            dataflowsTypeDefinition.AddMember(dataCtor)
 
             dataflowsTypeDefinition
 
         for dataflow in connection.Dataflows do
-            let dataflowId, dataflowName, agencyId, version = dataflow.Id, dataflow.Name, dataflow.AgencyID, dataflow.Version
+            let dataflowId, dataflowName, agencyId = dataflow.Id, dataflow.Name, dataflow.RefAgencyID
             //printfn "dataflowId: %s dataflowName: %s agencyId: %s version: %s" dataflowId, dataflowName, agencyId, version
-            let dataflowsTypeDefinition = datafowType dataflowName agencyId dataflowId
+            let dataflowsTypeDefinition = datafowType dataflowName dataflow.RefAgencyID dataflow.RefID dataflow.Id
             dataflowsTypeDefinition.AddMembersDelayed(
                  fun () ->
-                    [ for dimension in connection.GetDimensions(agencyId, dataflowId) do                         
+                    [ for dimension in connection.GetDimensions(dataflow.RefAgencyID, dataflow.RefID) do                         
                          if dataflowId = dimension.DataStructureId then
                             let dimensionTypeDefinition = ProvidedTypeDefinition(dimension.Name, Some typeof<DimensionObject>, hideObjectMethods = true, nonNullable = true)
                             let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
@@ -75,7 +68,9 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                                 let dimensionValueId = dimensionValue.Id
                                 let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<DimensionObject>, isStatic=true, getterCode = fun _ -> <@@ DimensionObject(wsEntryPoint, agencyId, dataflowId, dimensionId, dimensionValueId) @@>)                                
                                 dimensionTypeDefinition.AddMember dimensionValueProperty
+                            dimensionTypeDefinition.AddXmlDoc(dimension.Description)
                             yield dimensionTypeDefinition])
+            dataflowsTypeDefinition.AddXmlDoc(sprintf "<summary>Dataflow Type: %s</summary>" dataflow.Name)
             serviceTypesType.AddMember dataflowsTypeDefinition
             resTy.AddMember dataflowsTypeDefinition     
         resTy

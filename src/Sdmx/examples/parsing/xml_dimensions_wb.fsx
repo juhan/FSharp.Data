@@ -180,10 +180,17 @@ let xml = Http.RequestString("https://api.worldbank.org/v2/sdmx/rest/datastructu
 let xd = XDocument.Parse(xml)
 let rootElement = xd.Root
 let headerElement = rootElement.Element(xmes "Header")
+
+let resX = rootElement.Element(xmes "Header1")
+let res = not (resX = null)
+res
+
 let structuresElements = rootElement.Element(xmes "Structures")
 let codelistsElement = structuresElements.Element(xstr "Codelists")
 let codelistElements = codelistsElement.Elements(xstr "Codelist")
 let conceptsElement = structuresElements.Element(xstr "Concepts")
+let conceptsSchemeElement = conceptsElement.Element(xstr "ConceptScheme")
+let conceptsElements = conceptsSchemeElement.Elements(xstr "Concept")
 let dataStructuresElement = structuresElements.Element(xstr "DataStructures")
 let dimensionListElement = dataStructuresElement.Element(xstr "DataStructure").Element(xstr "DataStructureComponents").Element(xstr "DimensionList")
 let dimensionElements = dimensionListElement.Elements(xstr "Dimension")
@@ -192,24 +199,33 @@ let timeDimension = dimensionListElement.Element(xstr "TimeDimension")
 
 timeDimension
 
-let dimensions = 
+let dimensionRefs = 
     seq {
         for dimensionElement in dimensionElements do
             let enumerationId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "id")
-            let positionAttribute = dimensionElement.Attribute(xn "position")            
-            yield enumerationId.Value, positionAttribute.Value
+            let positionAttribute = dimensionElement.Attribute(xn "position")
+            let conceptIdAttribute = dimensionElement.Element(xstr "ConceptIdentity").Element(xn "Ref").Attribute(xn "id")
+            yield enumerationId.Value, positionAttribute.Value, conceptIdAttribute.Value
     }
 
+let h = Seq.head dimensionRefs
+
+let dimensionConceptOption = conceptsElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = "FREQ")
+dimensionConceptOption
+
+
 let dimensionRecords = seq { 
-    for enumerationId, position in dimensions do
-        let dimensionOption = codelistElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = enumerationId)
-        match dimensionOption with
-        | Some dimensionValue -> 
-            let dimensionCodes = dimensionValue.Elements(xstr "Code")
+    for enumerationId, position, conceptId in dimensionRefs do
+        let dimensionEnumerationOption = codelistElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = enumerationId)
+        let dimensionConceptOption = conceptsElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = conceptId)
+        match dimensionEnumerationOption, dimensionConceptOption with
+        | Some enumerationValue, Some conceptValue -> 
+            let dimensionCodes = enumerationValue.Elements(xstr "Code")
             for dimensionCode in dimensionCodes do
                 let dimensionName = dimensionCode.Element(xcom "Name").Value
                 yield (position, enumerationId, dimensionName)
-        | None -> printfn ""
+        | None, None -> printfn ""
+        | _ -> ""
 }
 
 
