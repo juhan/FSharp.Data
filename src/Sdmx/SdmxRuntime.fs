@@ -122,6 +122,9 @@ module Implementation =
                             let structuresElements = rootElement.Element(xmes "Structures")
                             let codelistsElement = structuresElements.Element(xstr "Codelists")
                             let codelistElements = codelistsElement.Elements(xstr "Codelist")
+                            let conceptsElement = structuresElements.Element(xstr "Concepts")
+                            let conceptsSchemeElement = conceptsElement.Element(xstr "ConceptScheme")
+                            let conceptsElements = conceptsSchemeElement.Elements(xstr "Concept")
                             let dataStructuresElement = structuresElements.Element(xstr "DataStructures")
                             let dataStructureElement = dataStructuresElement.Element(xstr "DataStructure")
                             let datastructureId = dataStructureElement.Attribute(xn "id").Value
@@ -141,23 +144,26 @@ module Implementation =
                                         let dimensionId = dimensionElement.Attribute(xn "id")
                                         let enumerationRefId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "id")
                                         let enumerationRefAgencyId = dimensionElement.Element(xstr "LocalRepresentation").Element(xstr "Enumeration").Element(xn "Ref").Attribute(xn "agencyID")
-                                        let positionAttribute = dimensionElement.Attribute(xn "position")            
-                                        yield dimensionId.Value, enumerationRefAgencyId.Value, enumerationRefId.Value, positionAttribute.Value
+                                        let positionAttribute = dimensionElement.Attribute(xn "position")
+                                        let conceptIdAttribute = dimensionElement.Element(xstr "ConceptIdentity").Element(xn "Ref").Attribute(xn "id")
+                                        yield dimensionId.Value, enumerationRefAgencyId.Value, enumerationRefId.Value, positionAttribute.Value, conceptIdAttribute.Value
                                 }
                             let d = [ 
-                                for dimensionId, enumerationRefAgencyId, enumerationRefId, position in dimensions do
+                                for dimensionId, enumerationRefAgencyId, enumerationRefId, position, conceptId  in dimensions do
                                     let dimensionOption = codelistElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = enumerationRefId)
-                                    match dimensionOption with
-                                    | Some dimensionValue -> 
+                                    let dimensionConceptOption = conceptsElements |> Seq.tryFind (fun xe -> xe.Attribute(xn "id").Value = conceptId)
+                                   
+                                    match dimensionOption,  dimensionConceptOption with
+                                    | Some dimensionValue, Some conceptValue -> 
                                         let dimensionCodes = dimensionValue.Elements(xstr "Code")
-                                        let dimensionName = dimensionValue.Element(xcom "Name").Value
+                                        let dimensionName = conceptValue.Element(xcom "Name").Value
                                         let dimensionRecords = seq {
                                             for dimensionCode in dimensionCodes do
                                                 let dimensionValue = dimensionCode.Element(xcom "Name").Value
                                                 let dimensionValueId = dimensionCode.Attribute(xn "id").Value
                                                 yield {
                                                     Id=dimensionValueId
-                                                    Name=dimensionValue
+                                                    Name=dimensionValue+"_"+dimensionValueId
                                                 }
                                         }
                                         yield {
@@ -170,6 +176,7 @@ module Implementation =
                                             Values=Seq.toList dimensionRecords
                                             Header=header
                                         }
+                                    | _ -> failwith "Faild to match %s %s" dimensionOption.Value dimensionConceptOption.Value
                             ]
                             d
             }
