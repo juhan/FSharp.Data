@@ -4,82 +4,28 @@
 open FSharp.Data
 open FSharp.Charting
 
-// WorldBank Provider For Comparision
-let data = WorldBankData.GetDataContext()
-let wbData = data.Countries.``United Kingdom``.Indicators.``Gross capital formation (% of GDP)``
 
-// type ECB = SdmxDataProvider<"https://sdw-wsrest.ecb.europa.eu/service"> //"/dataflow/all/all/latest/"
-// ECB.``Banknotes statistics``.ECB_BKN1BKN_DENOM.``20 cents``
-
+// WorldBank
 type WB = SdmxDataProvider<"https://api.worldbank.org/v2/sdmx/rest">
-let a = WB.``World Development Indicators``.``Frequency code list``.Annual
-let b = WB.``World Development Indicators``.``Reference area code list``.``United Kingdom``
-let c = WB.``World Development Indicators``.``Series code list``.``Gross capital formation (% of GDP)``
-let wdiDataflow = WB.``World Development Indicators``()
-let sdmxData = wdiDataflow.FetchData(a, b, c).Data
+type WDI = WB.``World Development Indicators``
 
-let wch = wbData |> Chart.Line
-let sch = sdmxData |> Chart.Line
-Chart.Combine( [Chart.Line(sdmxData); Chart.Line(wbData)] )
-invokeCode = (fun args -> 
-   <@@
-        // Todo Issue: cannot extract parameters to provide as an argument to DataFlowObject
-        //let dims = [for %%arg in args do yield (arg : DimensionObject) ]
-        let dims1 = %%args.[1] : DimensionObject
-        let dims2 = %%args.[2] : DimensionObject
-        let dims3 = %%args.[3] : DimensionObject
-        DataFlowObject(wsEntryPoint, dataflowId, [dims1; dims2; dims3])
-    @@>)
-
-// WB.``World Development Indicators``.``Reference area code list``.Albania
-
-// requirements section
-// include scenarios, 
-// refference stat.ee example from new document and try to replicate report produced by stat.ee office
-// this is help for validation 
-
-// Work with sdmx xmls
-// What is the right way to look up information required 
-// 1. (Dataflow Names), Agency Id 
-// 2. Lookup Dimensions in CodeLists structures
-// What is 
-
-// SdmxDataProvider<"World Development Indicators", Asynchronous=true>
-// let wb = SdmxData.GetDataContext()
-
-// wb.WDI.
-// wb.[Dataflow].[Dimention1].[Dimention2]
+let data = WDI(WDI.Frequency.Annual_A,
+               WDI.``Reference Area``.``United Kingdom_GBR``,
+               WDI.Series.``Gross capital formation (% of GDP)_NE_GDI_TOTL_ZS``).Data
 
 
-// wb.Countries.Togo.CapitalCity
-// Tproblem statement > introduction
-// mention javascript
-//bibtext uppercase put in {}
-// 3. Design of the sdmx
-//  Datasource profile, to the provider for stat.ee
-// went for xml because not all the providers support json and xml would give more coberage 
-// 4. Evaluation, case study stat.ee 
-// Debugging TypeProvider
+data |> Chart.Line
+// ECB
 
+type ECB = SdmxDataProvider<"http://a-sdw-wsrest.ecb.int/service">
 
-type DimensionObject = {DimensionName:string}
+type EXR = ECB.``Exchange Rates``
 
-// ProvidedMethod(methodName = "FetchData", 
-//                parameters = [
-//                     for dimension in connection.GetDimensions(agencyId, dataflowId) do
-//                         yield ProvidedParameter(dimension.DimensionName, typeof<DimensionObject>)                                        
-//                ], 
-//                returnType = typeof<DataFlowObject>, 
-//                invokeCode = (fun args -> 
-//                    <@@
-//                        //let dims = [for %%arg in args do yield (arg : DimensionObject) ]
-//                        let dims1 = %%args.[1] : DimensionObject
-//                        let dims2 = %%args.[2] : DimensionObject
-//                        let dims3 = %%args.[3] : DimensionObject
-//                        DataFlowObject(wsEntryPoint, dataflowId, [dims1; dims2; dims3])
-//                    @@>
-//                    )
-//                )              
-//usage
-let a = new DimensionObject(DimensionName="asd")
-// typeInstance.FetchData()
+let ecbData = EXR(
+        EXR.Frequency.Annual_A,
+        EXR.Currency.``US dollar_USD``,
+        EXR.``Currency denominator``.Euro_EUR,
+        EXR.``Exchange rate type``.Spot_SP00,
+        EXR.``Series variation - EXR context``.Average_A
+        )
+ecbData.Data |> Chart.Line

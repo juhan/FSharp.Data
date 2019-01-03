@@ -68,6 +68,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                                 let dimensionValueId = dimensionValue.Id
                                 let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<DimensionObject>, isStatic=true, getterCode = fun _ -> <@@ DimensionObject(wsEntryPoint, agencyId, dataflowId, dimensionId, dimensionValueId) @@>)                                
                                 dimensionTypeDefinition.AddMember dimensionValueProperty
+                            dimensionTypeDefinition.AddXmlDoc(dimension.Description)
                             yield dimensionTypeDefinition])
             serviceTypesType.AddMember dataflowsTypeDefinition
             resTy.AddMember dataflowsTypeDefinition     

@@ -46,6 +46,7 @@ module Implementation =
       
     type internal DimensionRecord =
         { Name : string
+          Description : string
           DataStructureId : string
           AgencyId : string
           Id : string
@@ -158,6 +159,10 @@ module Implementation =
                                     | Some dimensionValue, Some conceptValue -> 
                                         let dimensionCodes = dimensionValue.Elements(xstr "Code")
                                         let dimensionName = conceptValue.Element(xcom "Name").Value
+                                        let dimensionDescription =
+                                            match conceptValue.Element(xcom "Description") with
+                                            | x when not(x = null) -> x.Value
+                                            | _ -> "No Description"
                                         let dimensionRecords = seq {
                                             for dimensionCode in dimensionCodes do
                                                 let dimensionValue = dimensionCode.Element(xcom "Name").Value
@@ -169,6 +174,7 @@ module Implementation =
                                         }
                                         yield {
                                             Name=dimensionName
+                                            Description=dimensionDescription
                                             DataStructureId=datastructureId 
                                             AgencyId=enumerationRefAgencyId
                                             Id=dimensionId
