@@ -39,7 +39,6 @@ module Implementation =
          Prepared : string
          Sender : SenderRecord}
 
-    // todo make internal again
     type DimensionValueRecord =
         { Id : string
           Name: string}
@@ -270,7 +269,6 @@ module Implementation =
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
-/// Dataflow data
 type DimensionObject(serviceUrl: string, agencyId:string, dataflowId: string, dimensionId: string, dimensionValueId: string) =
     let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
     let connection = new ServiceConnection(restCache, serviceUrl)
@@ -295,7 +293,6 @@ type DimensionObject(serviceUrl: string, agencyId:string, dataflowId: string, di
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
-/// Dataflow data
 type DataFlowObject(serviceUrl: string, dataflowId: string, ?dimensions: list<DimensionObject>) =
     let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
     let connection = new ServiceConnection(restCache, serviceUrl)
@@ -309,13 +306,14 @@ type DataFlowObject(serviceUrl: string, dataflowId: string, ?dimensions: list<Di
                             connection.GetData(dataflowId, key) |> Seq.cache
                | _ -> Seq.empty
     
-    //let dataDict = lazy (dict data)
-
     member x.DataflowId = dataflowId
     member x.Name = connection.DataflowsIndexed.[dataflowId].Name
     member x.AgencyId = connection.DataflowsIndexed.[dataflowId].AgencyID
     member x.Version = connection.DataflowsIndexed.[dataflowId].Version
     member x.Data = data
+
+    interface seq<int * float> with member x.GetEnumerator() = data.GetEnumerator()
+    interface IEnumerable with member x.GetEnumerator() = (data.GetEnumerator() :> _)
 
 
 

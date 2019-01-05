@@ -24,18 +24,13 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
     let cacheDuration = TimeSpan.FromDays 30.0
     let restCache = createInternetFileCache "SdmxSchema" cacheDuration
 
-    let createTypesForWsEntryPoint(wsEntryPoint, sdmxTypeName, asynchronous) =
+    let createTypesForWsEntryPoint(wsEntryPoint, sdmxTypeName, asynchronous, language) =
         ProviderHelpers.getOrCreateProvidedType cfg this sdmxTypeName <| fun () ->
         let connection = ServiceConnection(restCache, wsEntryPoint)
         let resTy = ProvidedTypeDefinition(asm, ns, sdmxTypeName, Some typeof<obj>, hideObjectMethods = true, nonNullable = true)              
 
-        let serviceTypesType = 
-            let t = ProvidedTypeDefinition("ServiceTypes", None, hideObjectMethods = true, nonNullable = true)
-            t.AddXmlDoc("<summary>Contains the types that describe the data service</summary>")
-            resTy.AddMember t
-            t
         let datafowType dataflowName agencyId dataflowId dataId =
-            let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, Some typeof<DataFlowObject>, hideObjectMethods = false, nonNullable = true)
+            let dataflowsTypeDefinition = ProvidedTypeDefinition(dataflowName, Some typeof<DataFlowObject>, hideObjectMethods = true, nonNullable = true)
             let dataCtor =
                 ProvidedConstructor(
                     parameters = [
@@ -43,7 +38,8 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                             yield ProvidedParameter(dimension.Name, typeof<DimensionObject>)    
                     ],
                     invokeCode = ( fun args ->
-                        let dims = List.fold ( fun state e -> <@@ (%%e:DimensionObject)::%%state @@>) <@@ []:List<DimensionObject> @@> args
+                        let folder = fun state e -> <@@ (%%e:DimensionObject)::%%state @@>
+                        let dims = List.fold folder <@@ []:List<DimensionObject> @@> args
                         <@@
                             DataFlowObject(wsEntryPoint, dataId, %%dims)
                         @@>
@@ -54,23 +50,32 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
 
         for dataflow in connection.Dataflows do
             let dataflowId, dataflowName, agencyId, version = dataflow.Id, dataflow.Name, dataflow.AgencyID, dataflow.Version
-            //printfn "dataflowId: %s dataflowName: %s agencyId: %s version: %s" dataflowId, dataflowName, agencyId, version
             let dataflowsTypeDefinition = datafowType dataflowName agencyId dataflowId dataflow.DataId
             dataflowsTypeDefinition.AddMembersDelayed(
                  fun () ->
                     [ for dimension in connection.GetDimensions(agencyId, dataflowId) do                         
                          if dataflowId = dimension.DataStructureId then
-                            let dimensionTypeDefinition = ProvidedTypeDefinition(dimension.Name, Some typeof<DimensionObject>, hideObjectMethods = true, nonNullable = true)
-                            let ctor = ProvidedConstructor([], invokeCode = fun _ -> <@@ "My internal state" :> obj @@>)
-                            dimensionTypeDefinition.AddMember ctor
+                            let dimensionTypeDefinition =
+                                ProvidedTypeDefinition(dimension.Name,
+                                    Some typeof<DimensionObject>,
+                                    hideObjectMethods = true, nonNullable = true)
                             let dimensionId = dimension.Id 
                             for dimensionValue in dimension.Values do
                                 let dimensionValueId = dimensionValue.Id
-                                let dimensionValueProperty = ProvidedProperty(dimensionValue.Name, typeof<DimensionObject>, isStatic=true, getterCode = fun _ -> <@@ DimensionObject(wsEntryPoint, agencyId, dataflowId, dimensionId, dimensionValueId) @@>)                                
+                                let dimensionValueProperty =
+                                    ProvidedProperty(dimensionValue.Name,
+                                        typeof<DimensionObject>,
+                                        isStatic=true,
+                                        getterCode = fun _ ->
+                                            <@@
+                                                DimensionObject(wsEntryPoint, agencyId, dataflowId, dimensionId, dimensionValueId)
+                                            @@>
+                                    )
                                 dimensionTypeDefinition.AddMember dimensionValueProperty
                             dimensionTypeDefinition.AddXmlDoc(dimension.Description)
-                            yield dimensionTypeDefinition])
-            serviceTypesType.AddMember dataflowsTypeDefinition
+                            yield dimensionTypeDefinition
+                    ]
+                )
             resTy.AddMember dataflowsTypeDefinition     
         resTy
 
@@ -79,20 +84,24 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
 
         let defaultWsEntryPoint = ""//"https://api.worldbank.org/v2/sdmx/rest"
 
-        let helpText = "<summary>.. Sdmx Type Provider .. </summary>
+        let helpText = "<summary> Sdmx Type Provider </summary>
                         <param name='WsEntryPoint'>Sdmx rest web service entry point url.</param>
-                        <param name='Asynchronous'>Generate asynchronous calls. Defaults to false.</param>"
+                        <param name='Asynchronous'>Generate asynchronous calls. Defaults to false.</param>
+                        <param name='Language'>Language of type names, information and text. Defaults to en.</param>
+                        "
 
         sdmxProvTy.AddXmlDoc(helpText)
 
         let parameters =
             [ ProvidedStaticParameter("WsEntryPoint", typeof<string>, defaultWsEntryPoint)
-              ProvidedStaticParameter("Asynchronous", typeof<bool>, false) ]
+              ProvidedStaticParameter("Asynchronous", typeof<bool>, false)
+              ProvidedStaticParameter("Language", typeof<string>, "en")]
 
         sdmxProvTy.DefineStaticParameters(parameters, fun typeName providerArgs ->
             let wsEntryPoint = providerArgs.[0] :?> string
             let isAsync = providerArgs.[1] :?> bool
-            createTypesForWsEntryPoint(wsEntryPoint, typeName, isAsync))
+            let language = providerArgs.[2] :?> string
+            createTypesForWsEntryPoint(wsEntryPoint, typeName, isAsync, language))
         sdmxProvTy
 
     // Register the main type with F# compiler
