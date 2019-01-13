@@ -255,7 +255,7 @@ module Implementation =
                     return 
                       seq { for k, v in data do
                               if not (String.IsNullOrEmpty v) then 
-                                 yield int k, float v } 
+                                 yield k, float v } 
                       // It's a time series - sort it :-)  We should probably also interpolate (e.g. see R time series library)
                       |> Seq.sortBy fst } 
 
@@ -293,16 +293,22 @@ type DimensionObject(serviceUrl: string, agencyId:string, dataflowId: string, di
 
 [<DebuggerDisplay("{Name}")>]
 [<StructuredFormatDisplay("{Name}")>]
-type DataFlowObject(serviceUrl: string, dataflowId: string, ?dimensions: list<DimensionObject>) =
+type DataFlowObject(serviceUrl: string, dataflowId: string, ?seriesKey:string, ?dimensions: list<DimensionObject>) =
     let restCache = createInternetFileCache "SdmxRuntime" (TimeSpan.FromDays 30.0)
     let connection = new ServiceConnection(restCache, serviceUrl)
-
-    let data = match dimensions with
-               | Some dim ->
-                            let key = dim
+    let seriesKey = match seriesKey with
+               | Some key when key.Length > 0 ->
+                    key
+               | _ -> match dimensions with
+                      | Some dim -> dim
                                       |> Seq.sortBy (fun arg -> int arg.Position)
                                       |> Seq.map (fun e -> e.DimensionValueId )
                                       |> Seq.toList |> String.concat "."
+                           
+                      | _ -> ""
+
+    let data = match seriesKey with
+               | key when key.Length>0 ->
                             connection.GetData(dataflowId, key) |> Seq.cache
                | _ -> Seq.empty
     
@@ -311,8 +317,9 @@ type DataFlowObject(serviceUrl: string, dataflowId: string, ?dimensions: list<Di
     member x.AgencyId = connection.DataflowsIndexed.[dataflowId].AgencyID
     member x.Version = connection.DataflowsIndexed.[dataflowId].Version
     member x.Data = data
+    member x.SeriesKey = seriesKey
 
-    interface seq<int * float> with member x.GetEnumerator() = data.GetEnumerator()
+    interface seq<string * float> with member x.GetEnumerator() = data.GetEnumerator()
     interface IEnumerable with member x.GetEnumerator() = (data.GetEnumerator() :> _)
 
 

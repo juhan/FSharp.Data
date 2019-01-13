@@ -41,11 +41,24 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                         let folder = fun state e -> <@@ (%%e:DimensionObject)::%%state @@>
                         let dims = List.fold folder <@@ []:List<DimensionObject> @@> args
                         <@@
-                            DataFlowObject(wsEntryPoint, dataId, %%dims)
+                            DataFlowObject(wsEntryPoint, dataId, "", %%dims)
                         @@>
                     )
             )
+                ProvidedConstructor(
+                    parameters = [
+                        yield ProvidedParameter("seriesKey", typeof<string>)
+                    ],
+                    invokeCode = ( fun args ->
+                        let seriesKey = <@@ (%%args.Head:string ) @@>
+                        <@@
+                            DataFlowObject(wsEntryPoint, dataId, %%seriesKey, [])
+                        @@>
+                    )
+            )
+
             dataflowsTypeDefinition.AddMember(dataCtor)
+            dataflowsTypeDefinition.AddMember(keyCtor)
             dataflowsTypeDefinition
 
         for dataflow in connection.Dataflows do
