@@ -45,6 +45,7 @@ type public SmdxProvider(cfg:TypeProviderConfig) as this =
                         @@>
                     )
             )
+            let keyCtor = // TODO: implement type checking on the series key passed as argument.
                 ProvidedConstructor(
                     parameters = [
                         yield ProvidedParameter("seriesKey", typeof<string>)
